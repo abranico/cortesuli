@@ -8,6 +8,8 @@ import type {
   Product,
   Salon,
   SalonCatalog,
+  SalonSearchQuery,
+  SalonSearchResult,
   Service,
   Slot,
   Stylist,
@@ -39,6 +41,8 @@ function mapSalon(r: Row): Salon {
     instagram: str(r.instagram),
     hours: str(r.hours),
     coverImageUrl: (r.cover_image_url as string | null) ?? null,
+    lat: r.lat == null ? null : Number(r.lat),
+    lng: r.lng == null ? null : Number(r.lng),
   };
 }
 
@@ -117,6 +121,54 @@ export async function getSalonBySlug(slug: string): Promise<Salon | null> {
   const { data, error } = await createAnonClient().from("salons").select("*").eq("slug", slug).maybeSingle();
   if (error) fail("getSalonBySlug", error);
   return data ? mapSalon(data) : null;
+}
+
+/** Saca comodines de LIKE y caracteres reservados del filtro `or` de PostgREST. */
+function likeTerm(v: string): string {
+  return `%${v.replace(/[\\%_,()"*]/g, " ").replace(/\s+/g, " ").trim()}%`;
+}
+
+const fold = (v: string) => v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const rad = (d: number) => (d * Math.PI) / 180;
+  const dLat = rad(b.lat - a.lat);
+  const dLng = rad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.sqrt(h));
+}
+
+/** Búsqueda pública de peluquerías por nombre, barrio/ciudad y/o cercanía (ordena por distancia si hay `near`). */
+export async function searchSalons(query: SalonSearchQuery): Promise<SalonSearchResult[]> {
+  const q = query.q?.trim().slice(0, 80) ?? "";
+  const location = query.location?.trim().slice(0, 80) ?? "";
+  const near = query.near && Number.isFinite(query.near.lat) && Number.isFinite(query.near.lng) ? query.near : undefined;
+
+  let req = createAnonClient().from("salons").select("*");
+  if (q) req = req.ilike("name", likeTerm(q));
+  if (location) {
+    const term = likeTerm(location);
+    req = req.or(`address.ilike."${term}",city.ilike."${term}"`);
+  }
+  const { data, error } = await req.order("name").limit(50);
+  if (error) fail("searchSalons", error);
+
+  let salons: SalonSearchResult[] = (data ?? []).map(mapSalon);
+  if (salons.length === 0 && (q || location)) {
+    // Fallback sin acentos ("cordoba" encuentra "Córdoba"): pocos salones, filtramos en memoria.
+    const all = await createAnonClient().from("salons").select("*").order("name").limit(500);
+    if (all.error) fail("searchSalons", all.error);
+    const fq = fold(q);
+    const fl = fold(location);
+    salons = (all.data ?? [])
+      .map(mapSalon)
+      .filter((s) => (!fq || fold(s.name).includes(fq)) && (!fl || fold(`${s.address} ${s.city}`).includes(fl)));
+  }
+  if (!near) return salons.slice(0, 12);
+  return salons
+    .map((s) => (s.lat != null && s.lng != null ? { ...s, distanceKm: haversineKm(near, { lat: s.lat, lng: s.lng }) } : s))
+    .sort((a, b) => (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity))
+    .slice(0, 12);
 }
 
 export async function getSalonCatalog(salonId: string): Promise<SalonCatalog> {

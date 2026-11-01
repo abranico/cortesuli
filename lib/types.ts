@@ -10,7 +10,18 @@ export type Salon = {
   instagram: string;
   hours: string;
   coverImageUrl: string | null;
+  /** Coordenadas WGS84 para la búsqueda "cerca mío" (opcionales). */
+  lat?: number | null;
+  lng?: number | null;
 };
+
+export type SalonSearchQuery = {
+  q?: string;
+  location?: string;
+  near?: { lat: number; lng: number };
+};
+
+export type SalonSearchResult = Salon & { distanceKm?: number };
 
 export type Stylist = {
   id: string;
