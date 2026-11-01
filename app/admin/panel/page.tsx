@@ -1,9 +1,15 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import QRCode from "qrcode";
 import { getCurrentAdmin, getSalonCatalog, listAppointments } from "@/lib/data";
+import { computeMetrics } from "@/lib/metrics";
+import { dayKey, dayLabel, openSlotDays, shortDate, timeLabel } from "@/lib/schedule";
 import type { Appointment } from "@/lib/types";
 import { logoutAction } from "../actions";
 import AppointmentRow, { type AppointmentRowData } from "@/components/admin/AppointmentRow";
+import Metrics from "@/components/admin/Metrics";
+import NewAppointmentButton, { type ManualDay } from "@/components/admin/NewAppointmentButton";
+import QrCard from "@/components/admin/QrCard";
 import StylistsManager from "@/components/admin/StylistsManager";
 import { Logo } from "@/components/landing/ui";
 
@@ -11,30 +17,19 @@ export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Agenda · Panel de peluquerías" };
 
-const TZ = "America/Argentina/Buenos_Aires";
-const dayKey = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(new Date(iso));
-const timeLabel = (iso: string) => new Date(iso).toLocaleTimeString("es-AR", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
-
-type Tab = "turnos" | "historial" | "peluqueros";
+type Tab = "turnos" | "historial" | "peluqueros" | "metricas" | "qr";
 const TABS: { key: Tab; label: string }[] = [
   { key: "turnos", label: "Turnos" },
   { key: "historial", label: "Historial" },
   { key: "peluqueros", label: "Peluqueros" },
+  { key: "metricas", label: "Métricas" },
+  { key: "qr", label: "Mi QR" },
 ];
+const FILTERABLE: Tab[] = ["turnos", "historial"];
 
 // Página dinámica: se renderiza por request, la hora actual es estable dentro del render.
 function requestTime() {
   return Date.now();
-}
-
-function dayLabel(key: string, now: number) {
-  const today = dayKey(new Date(now).toISOString());
-  if (key === today) return "Hoy";
-  if (key === dayKey(new Date(now + 86400000).toISOString())) return "Mañana";
-  if (key === dayKey(new Date(now - 86400000).toISOString())) return "Ayer";
-  return new Intl.DateTimeFormat("es-AR", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })
-    .format(new Date(`${key}T12:00:00Z`))
-    .replace(/[.,]/g, "");
 }
 
 function groupByDay(items: AppointmentRowData[]) {
@@ -45,6 +40,9 @@ function groupByDay(items: AppointmentRowData[]) {
   }
   return [...groups.entries()];
 }
+
+/** Origen público del sitio para el QR: siempre el dominio de producción (se puede pisar con NEXT_PUBLIC_SITE_URL). */
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") || "https://dwday-125150057.online";
 
 const UNASSIGNED = "sin-asignar";
 
@@ -60,7 +58,7 @@ export default async function AdminPanelPage({ searchParams }: { searchParams: P
   const stylists = new Map(catalog.stylists.map((s) => [s.id, s.name]));
 
   const now = requestTime();
-  const todayKey = dayKey(new Date(now).toISOString());
+  const todayKey = dayKey(now);
   const toRow = (a: Appointment): AppointmentRowData => ({
     id: a.id,
     start: a.start,
@@ -73,9 +71,13 @@ export default async function AdminPanelPage({ searchParams }: { searchParams: P
     cutName: a.cutName,
     cutDescription: a.cutDescription,
     images: a.images,
+    // Las reservas online guardan en notas el análisis de la IA (ya resumido en el corte); solo mostramos las notas manuales.
+    notes: a.source === "manual" ? a.notes : "",
+    manual: a.source === "manual",
   });
 
-  const pending = appointments.filter((a) => a.status === "pendiente").map(toRow);
+  const pendingAppointments = appointments.filter((a) => a.status === "pendiente");
+  const pending = pendingAppointments.map(toRow);
   const done = appointments
     .filter((a) => a.status === "completado")
     .sort((a, b) => b.start.localeCompare(a.start))
@@ -90,9 +92,39 @@ export default async function AdminPanelPage({ searchParams }: { searchParams: P
   const visiblePending = pending.filter(matches);
   const visibleDone = done.filter(matches);
 
+  // Horarios para cargar turnos a mano: 3 semanas, con lugares libres y peluqueros ocupados por bloque.
+  const capacity = Math.max(catalog.stylists.length, 1);
+  const manualDays: ManualDay[] =
+    tab === "turnos"
+      ? openSlotDays(salon, now, 21).map((d) => ({
+          key: d.key,
+          label: dayLabel(d.key, now) === shortDate(d.key) ? shortDate(d.key) : `${dayLabel(d.key, now)} · ${shortDate(d.key)}`,
+          slots: d.starts.map((t) => {
+            const iso = new Date(t).toISOString();
+            const here = pendingAppointments.filter((a) => a.start === iso);
+            return {
+              start: iso,
+              label: timeLabel(t),
+              remaining: Math.max(capacity - here.length, 0),
+              busyStylists: here.map((a) => a.stylistId).filter((x): x is string => !!x),
+            };
+          }),
+        }))
+      : [];
+
+  const metrics = tab === "metricas" ? computeMetrics(appointments, catalog, salon, now) : null;
+
+  let qr: { url: string; svg: string; png: string } | null = null;
+  if (tab === "qr") {
+    const url = `${SITE_URL}/peluqueria/${salon.slug}`;
+    const opts = { margin: 1, errorCorrectionLevel: "M" as const, color: { dark: "#14201a", light: "#ffffff" } };
+    const [svg, png] = await Promise.all([QRCode.toString(url, { ...opts, type: "svg" }), QRCode.toDataURL(url, { ...opts, width: 1024 })]);
+    qr = { url, svg, png };
+  }
+
   return (
-    <main className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
+    <main className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 print:max-w-none print:p-0">
+      <header className="flex flex-wrap items-center justify-between gap-3 print:hidden">
         <div className="flex items-center gap-3">
           <Logo />
           <span className="h-5 w-px bg-neutral-200" />
@@ -113,37 +145,50 @@ export default async function AdminPanelPage({ searchParams }: { searchParams: P
         </div>
       </header>
 
-      <nav className="mt-6 flex gap-1 border-b border-neutral-200">
+      <nav className="-mx-4 mt-6 flex gap-1 overflow-x-auto border-b border-neutral-200 px-4 sm:mx-0 sm:px-0 print:hidden">
         {TABS.map((t) => {
-          const count = t.key === "turnos" ? pending.length : t.key === "historial" ? done.length : catalog.stylists.length;
+          const count = t.key === "turnos" ? pending.length : t.key === "historial" ? done.length : t.key === "peluqueros" ? catalog.stylists.length : null;
           return (
             <Link
               key={t.key}
-              href={`/admin/panel?tab=${t.key}${filter && t.key !== "peluqueros" ? `&peluquero=${filter}` : ""}`}
-              className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition ${
+              href={`/admin/panel?tab=${t.key}${filter && FILTERABLE.includes(t.key) ? `&peluquero=${filter}` : ""}`}
+              className={`-mb-px shrink-0 border-b-2 px-3 py-2 text-sm font-medium transition ${
                 tab === t.key ? "border-accent text-accent" : "border-transparent text-neutral-500 hover:text-neutral-900"
               }`}
             >
-              {t.label} <span className="text-xs font-normal text-neutral-400">{count}</span>
+              {t.label} {count !== null && <span className="text-xs font-normal text-neutral-400">{count}</span>}
             </Link>
           );
         })}
       </nav>
 
-      {tab !== "peluqueros" && catalog.stylists.length > 0 && (
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <span className="text-xs text-neutral-500">Peluquero:</span>
-          {filterOptions.map((o) => (
-            <Link
-              key={o.id || "todos"}
-              href={filterHref(o.id)}
-              className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
-                filter === o.id ? "border-accent bg-accent text-white" : "border-neutral-200 bg-white text-neutral-600 hover:border-neutral-400"
-              }`}
-            >
-              {o.name}
-            </Link>
-          ))}
+      {FILTERABLE.includes(tab) && (catalog.stylists.length > 0 || tab === "turnos") && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            {catalog.stylists.length > 0 && (
+              <>
+                <span className="text-xs text-neutral-500">Peluquero:</span>
+                {filterOptions.map((o) => (
+                  <Link
+                    key={o.id || "todos"}
+                    href={filterHref(o.id)}
+                    className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                      filter === o.id ? "border-accent bg-accent text-white" : "border-neutral-200 bg-white text-neutral-600 hover:border-neutral-400"
+                    }`}
+                  >
+                    {o.name}
+                  </Link>
+                ))}
+              </>
+            )}
+          </div>
+          {tab === "turnos" && (
+            <NewAppointmentButton
+              days={manualDays}
+              services={catalog.services.map((s) => ({ id: s.id, name: s.name, price: s.price }))}
+              stylists={stylistOptions}
+            />
+          )}
         </div>
       )}
 
@@ -185,6 +230,18 @@ export default async function AdminPanelPage({ searchParams }: { searchParams: P
       {tab === "peluqueros" && (
         <section className="mt-6">
           <StylistsManager stylists={catalog.stylists.map((s) => ({ id: s.id, name: s.name, specialties: s.specialties }))} />
+        </section>
+      )}
+
+      {metrics && (
+        <section className="mt-6">
+          <Metrics m={metrics} />
+        </section>
+      )}
+
+      {qr && (
+        <section className="mt-6">
+          <QrCard salonName={salon.name} url={qr.url} svg={qr.svg} png={qr.png} fileName={`qr-${salon.slug}.png`} />
         </section>
       )}
     </main>

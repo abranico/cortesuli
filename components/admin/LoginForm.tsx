@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { startTransition, useActionState, useState } from "react";
 import { loginAction, type LoginState } from "@/app/admin/actions";
 
@@ -77,6 +78,12 @@ export default function LoginForm() {
           Ingresar
         </button>
       </form>
+
+      <p className="mt-6 text-center text-xs text-neutral-400">
+        <Link href="/admin/registro" className="hover:text-accent hover:underline">
+          ¿Tenés una peluquería? Creá la tuya
+        </Link>
+      </p>
     </div>
   );
 }

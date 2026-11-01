@@ -16,6 +16,9 @@ export type AppointmentRowData = {
   cutName: string;
   cutDescription: string;
   images: CutImages;
+  notes?: string;
+  /** Cargado a mano desde el panel (teléfono, WhatsApp, en el local). */
+  manual?: boolean;
 };
 
 const ANGLES: { key: keyof CutImages; label: string }[] = [
@@ -71,7 +74,14 @@ export default function AppointmentRow({
         <span className="w-12 shrink-0 font-mono text-sm font-semibold tabular-nums">{a.time}</span>
 
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">{a.customerName}</p>
+          <p className="flex items-center gap-2 text-sm font-medium">
+            <span className="truncate">{a.customerName}</span>
+            {a.manual && (
+              <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-neutral-500">
+                A mano
+              </span>
+            )}
+          </p>
           <p className="flex flex-wrap gap-x-2 text-xs text-neutral-500">
             {a.customerPhone && (
               <>
@@ -125,6 +135,11 @@ export default function AppointmentRow({
         )}
       </div>
       {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+      {a.notes && (
+        <p className="mt-2 whitespace-pre-line text-xs text-neutral-500">
+          <span className="font-medium text-neutral-600">Nota:</span> {a.notes}
+        </p>
+      )}
       {(shots.length > 0 || a.cutName || a.cutDescription) && (
         <div className="mt-3 flex flex-col gap-3">
           {(a.cutName || a.cutDescription) && (
