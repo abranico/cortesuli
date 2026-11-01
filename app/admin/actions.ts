@@ -114,10 +114,13 @@ export async function checkSlugAction(slug: string): Promise<{ available: boolea
   }
 }
 
-export type RegisterState = { error: string | null };
+const REGISTER_FIELDS = ["address", "city", "phone", "price", "ownerName", "email"] as const;
+export type RegisterState = { error: string | null; values?: Partial<Record<(typeof REGISTER_FIELDS)[number], string>> };
 
 export async function registerSalonAction(_prev: RegisterState, formData: FormData): Promise<RegisterState> {
   const get = (k: string) => String(formData.get(k) ?? "").trim();
+  const values = Object.fromEntries(REGISTER_FIELDS.map((k) => [k, get(k).slice(0, 200)]));
+  const fail = (error: string): RegisterState => ({ error, values });
   const salonName = get("salonName");
   const slug = get("slug").toLowerCase();
   const address = get("address");
@@ -129,12 +132,12 @@ export async function registerSalonAction(_prev: RegisterState, formData: FormDa
   const rawPrice = get("price").replace(/[^\d]/g, "");
   const price = rawPrice ? Number(rawPrice) : null;
 
-  if (salonName.length < 2) return { error: "Poné el nombre de la peluquería." };
+  if (salonName.length < 2) return fail("Poné el nombre de la peluquería.");
   if (slug.length < 3 || slug.length > 40 || !SLUG_RE.test(slug))
-    return { error: "El link solo puede tener letras minúsculas, números y guiones (3 a 40 caracteres)." };
-  if (ownerName.length < 2) return { error: "Poné tu nombre." };
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { error: "El email no es válido." };
-  if (password.length < 6) return { error: "La contraseña tiene que tener al menos 6 caracteres." };
+    return fail("El link solo puede tener letras minúsculas, números y guiones (3 a 40 caracteres).");
+  if (ownerName.length < 2) return fail("Poné tu nombre.");
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail("El email no es válido.");
+  if (password.length < 6) return fail("La contraseña tiene que tener al menos 6 caracteres.");
 
   const coords = await geocodeAddress(address, city);
   try {
@@ -152,12 +155,14 @@ export async function registerSalonAction(_prev: RegisterState, formData: FormDa
       lng: coords?.lng ?? null,
     });
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "No pudimos crear tu peluquería." };
+    console.error(e);
+    const known = e instanceof Error && !e.message.startsWith("registerSalon:");
+    return fail(known ? (e as Error).message : "No pudimos crear tu peluquería. Probá de nuevo.");
   }
 
   const sb = await createClient();
   const { error } = await sb.auth.signInWithPassword({ email, password });
-  if (error) return { error: "Tu peluquería quedó creada, pero no pudimos iniciar sesión. Ingresá desde el panel." };
+  if (error) return fail("Tu peluquería quedó creada, pero no pudimos iniciar sesión. Ingresá desde el panel.");
   revalidatePath("/");
   redirect("/admin/panel");
 }

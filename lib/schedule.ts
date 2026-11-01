@@ -12,7 +12,7 @@ export type OpeningRules = { openDays: number[]; openHour: number; closeHour: nu
 export const dayKey = (iso: string | number | Date) => new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(new Date(iso));
 
 export const timeLabel = (iso: string | number | Date) =>
-  new Date(iso).toLocaleTimeString("es-AR", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
+  new Date(iso).toLocaleTimeString("es-AR", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 
 /** Medianoche argentina del día de `now`, expresada como "día UTC" (para iterar sin líos de zona). */
 function localDayStart(now: number) {
@@ -44,12 +44,16 @@ export function openSlotDays(rules: OpeningRules, now: number, days: number): Sl
   return out;
 }
 
+/** "mar 3 nov" a partir de "YYYY-MM-DD". */
+export const shortDate = (key: string) =>
+  new Intl.DateTimeFormat("es-AR", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })
+    .format(new Date(`${key}T12:00:00Z`))
+    .replace(/[.,]/g, "");
+
 export function dayLabel(key: string, now: number) {
   const today = dayKey(now);
   if (key === today) return "Hoy";
   if (key === dayKey(now + DAY_MS)) return "Mañana";
   if (key === dayKey(now - DAY_MS)) return "Ayer";
-  return new Intl.DateTimeFormat("es-AR", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })
-    .format(new Date(`${key}T12:00:00Z`))
-    .replace(/[.,]/g, "");
+  return shortDate(key);
 }
