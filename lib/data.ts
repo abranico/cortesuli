@@ -124,8 +124,8 @@ export async function getSalonBySlug(slug: string): Promise<Salon | null> {
 }
 
 /** Saca comodines de LIKE y caracteres reservados del filtro `or` de PostgREST. */
-function likeTerm(v: string): string {
-  return `%${v.replace(/[\\%_,()"*]/g, " ").replace(/\s+/g, " ").trim()}%`;
+function cleanTerm(v: string | undefined): string {
+  return (v ?? "").slice(0, 80).replace(/[\\%_,()"*]/g, " ").replace(/\s+/g, " ").trim();
 }
 
 const fold = (v: string) => v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -140,16 +140,13 @@ function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: num
 
 /** Búsqueda pública de peluquerías por nombre, barrio/ciudad y/o cercanía (ordena por distancia si hay `near`). */
 export async function searchSalons(query: SalonSearchQuery): Promise<SalonSearchResult[]> {
-  const q = query.q?.trim().slice(0, 80) ?? "";
-  const location = query.location?.trim().slice(0, 80) ?? "";
+  const q = cleanTerm(query.q);
+  const location = cleanTerm(query.location);
   const near = query.near && Number.isFinite(query.near.lat) && Number.isFinite(query.near.lng) ? query.near : undefined;
 
   let req = createAnonClient().from("salons").select("*");
-  if (q) req = req.ilike("name", likeTerm(q));
-  if (location) {
-    const term = likeTerm(location);
-    req = req.or(`address.ilike."${term}",city.ilike."${term}"`);
-  }
+  if (q) req = req.ilike("name", `%${q}%`);
+  if (location) req = req.or(`address.ilike."%${location}%",city.ilike."%${location}%"`);
   const { data, error } = await req.order("name").limit(50);
   if (error) fail("searchSalons", error);
 
