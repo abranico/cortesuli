@@ -13,6 +13,10 @@ export type Salon = {
   /** Coordenadas WGS84 para la búsqueda "cerca mío" (opcionales). */
   lat?: number | null;
   lng?: number | null;
+  /** Reglas de apertura: días (0 = domingo) y franja horaria en hora argentina. */
+  openDays: number[];
+  openHour: number;
+  closeHour: number;
 };
 
 export type SalonSearchQuery = {
@@ -56,6 +60,9 @@ export type CutImages = {
 
 export type AppointmentStatus = "pendiente" | "completado";
 
+/** online = reservado por el cliente desde la página; manual = cargado por el local desde el panel. */
+export type AppointmentSource = "online" | "manual";
+
 export type Appointment = {
   id: string;
   salonId: string;
@@ -69,7 +76,17 @@ export type Appointment = {
   cutDescription: string;
   images: CutImages;
   notes: string;
+  source: AppointmentSource;
   createdAt: string;
+};
+
+export type ManualAppointment = {
+  serviceId: string | null;
+  stylistId: string | null;
+  customerName: string;
+  customerPhone: string;
+  start: string;
+  notes: string;
 };
 
 export type NewAppointment = Pick<

@@ -3,6 +3,7 @@ import { createAnonClient, createClient } from "./supabase/server";
 import type {
   Appointment,
   CutImages,
+  ManualAppointment,
   NewAppointment,
   Salon,
   SalonCatalog,
@@ -42,6 +43,9 @@ function mapSalon(r: Row): Salon {
     coverImageUrl: (r.cover_image_url as string | null) ?? null,
     lat: r.lat == null ? null : Number(r.lat),
     lng: r.lng == null ? null : Number(r.lng),
+    openDays: Array.isArray(r.open_days) ? r.open_days.map(Number) : [2, 3, 4, 5, 6],
+    openHour: r.open_hour == null ? 10 : Number(r.open_hour),
+    closeHour: r.close_hour == null ? 20 : Number(r.close_hour),
   };
 }
 
@@ -80,6 +84,7 @@ function mapAppointment(r: Row): Appointment {
     cutDescription: str(r.cut_description),
     images: (r.images as CutImages | null) ?? {},
     notes: str(r.notes),
+    source: r.source === "manual" ? "manual" : "online",
     createdAt: new Date(str(r.created_at)).toISOString(),
   };
 }
@@ -269,6 +274,66 @@ export async function listAppointments(salonId: string): Promise<Appointment[]> 
   const { data, error } = await sb.from("appointments").select("*").eq("salon_id", salonId).order("start_at");
   if (error) fail("listAppointments", error);
   return (data ?? []).map(mapAppointment);
+}
+
+/** Turno cargado a mano desde el panel: misma regla de cupos que la reserva online (RPC atómico). */
+export async function createManualAppointment(input: ManualAppointment): Promise<Appointment> {
+  const sb = await createClient();
+  const { data, error } = await sb.rpc("admin_book_appointment", {
+    p_service_id: input.serviceId ?? "",
+    p_stylist_id: input.stylistId ?? "",
+    p_customer_name: input.customerName,
+    p_customer_phone: input.customerPhone,
+    p_start: new Date(input.start).toISOString(),
+    p_notes: input.notes,
+  });
+  if (error) {
+    if (error.code === "P0001") throw new Error(error.message);
+    fail("createManualAppointment", error);
+  }
+  return mapAppointment((Array.isArray(data) ? data[0] : data) as Row);
+}
+
+export async function isSlugTaken(slug: string): Promise<boolean> {
+  const { count, error } = await createAnonClient().from("salons").select("id", { count: "exact", head: true }).eq("slug", slug);
+  if (error) fail("isSlugTaken", error);
+  return (count ?? 0) > 0;
+}
+
+export type NewSalonRegistration = {
+  email: string;
+  password: string;
+  salonName: string;
+  slug: string;
+  address: string;
+  city: string;
+  phone: string;
+  ownerName: string;
+  price: number | null;
+  lat: number | null;
+  lng: number | null;
+};
+
+/** Alta atómica (usuario confirmado + salón + admin + peluquero + servicio) vía RPC `register_salon`. Devuelve el slug. */
+export async function registerSalon(input: NewSalonRegistration): Promise<string> {
+  const { data, error } = await createAnonClient().rpc("register_salon", {
+    p_email: input.email,
+    p_password: input.password,
+    p_salon_name: input.salonName,
+    p_slug: input.slug,
+    p_address: input.address,
+    p_city: input.city,
+    p_phone: input.phone,
+    p_owner_name: input.ownerName,
+    p_price: input.price,
+    p_lat: input.lat,
+    p_lng: input.lng,
+  });
+  if (error) {
+    if (error.code === "P0001") throw new Error(error.message);
+    fail("registerSalon", error);
+  }
+  return String(data);
 }
 
 export async function assignStylist(salonId: string, id: string, stylistId: string | null): Promise<void> {
