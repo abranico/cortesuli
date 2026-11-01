@@ -103,7 +103,7 @@ export default async function SalonPage({ params }: Props) {
       </section>
 
       {/* Cómo funciona */}
-      <section className="border-t border-foreground/10 bg-surface/40">
+      <section className="border-t border-foreground/10 bg-surface/60">
         <div className="mx-auto max-w-6xl px-5 py-16 sm:px-8 lg:py-20">
           <SectionTitle
             eyebrow="Cómo funciona"
@@ -137,7 +137,7 @@ export default async function SalonPage({ params }: Props) {
       </section>
 
       {/* Equipo */}
-      <section className="border-t border-foreground/10 bg-surface/40">
+      <section className="border-t border-foreground/10 bg-surface/60">
         <div className="mx-auto max-w-6xl px-5 py-16 sm:px-8 lg:py-20">
           <SectionTitle
             eyebrow="El equipo"
