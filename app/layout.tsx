@@ -19,16 +19,17 @@ const display = Fraunces({
 
 export const metadata: Metadata = {
   title: {
-    default: "Espejo — Probate el corte antes de cortarte",
-    template: "%s · Espejo",
+    default: "Cortesuli — Probate el corte antes de cortarte",
+    template: "%s · Cortesuli",
   },
   description:
-    "Turnos online con IA para peluquerías y barberías: tus clientes se prueban el corte en su propia cara, eligen y reservan con el peluquero ideal.",
-  applicationName: "Espejo",
+    "Turnos online con IA para peluquerías y barberías: tus clientes se prueban el corte en su propia cara, lo ven desde todos los ángulos y reservan su turno.",
+  applicationName: "Cortesuli",
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0b0a09",
+  themeColor: "#f7f8f5",
+  colorScheme: "light",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

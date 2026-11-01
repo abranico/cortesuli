@@ -96,7 +96,7 @@ export default function GuidedCapture({ onDone }: { onDone: (photos: CapturedPho
 
   return (
     <div className="flex flex-col items-center gap-5">
-      <div className="relative aspect-square w-full max-w-md overflow-hidden rounded-3xl bg-surface">
+      <div className="relative aspect-square w-full max-w-md overflow-hidden rounded-3xl bg-neutral-900 shadow-lg">
         {!error && (
           <video
             ref={videoRef}
@@ -110,7 +110,7 @@ export default function GuidedCapture({ onDone }: { onDone: (photos: CapturedPho
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div
             className={`h-[78%] w-[60%] rounded-[50%] border-4 transition-colors duration-300 ${
-              flash ? "border-emerald-400" : running ? "border-accent" : "border-white/60"
+              flash ? "border-emerald-400" : running ? "border-green-400" : "border-white/60"
             }`}
             style={{ boxShadow: "0 0 0 9999px rgba(0,0,0,0.45)" }}
           />
@@ -121,7 +121,7 @@ export default function GuidedCapture({ onDone }: { onDone: (photos: CapturedPho
           </div>
         )}
         {flash && <div className="absolute inset-0 bg-white/60" />}
-        {error && <div className="absolute inset-0 flex items-center justify-center p-8 text-center text-neutral-300">{error}</div>}
+        {error && <div className="absolute inset-0 flex items-center justify-center p-8 text-center text-neutral-200">{error}</div>}
       </div>
 
       <div className="flex gap-3">
@@ -129,7 +129,7 @@ export default function GuidedCapture({ onDone }: { onDone: (photos: CapturedPho
           <div
             key={s.key}
             className={`flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 text-xs ${
-              shots[i] ? "border-emerald-400" : running && i === stepIdx ? "border-accent" : "border-neutral-700"
+              shots[i] ? "border-emerald-500" : running && i === stepIdx ? "border-accent" : "border-neutral-300"
             }`}
           >
             {shots[i] ? (
@@ -150,13 +150,13 @@ export default function GuidedCapture({ onDone }: { onDone: (photos: CapturedPho
         <button
           onClick={start}
           disabled={!ready}
-          className="w-full max-w-md rounded-full bg-accent px-6 py-4 text-lg font-semibold text-ink transition hover:bg-accent-soft disabled:opacity-40"
+          className="w-full max-w-md rounded-full bg-accent px-6 py-4 text-lg font-semibold text-white transition hover:bg-accent-strong disabled:opacity-40"
         >
           {ready ? "Empezar" : "Abriendo cámara..."}
         </button>
       )}
       {!running && (
-        <label className="cursor-pointer text-sm text-neutral-400 underline underline-offset-4 hover:text-neutral-200">
+        <label className="cursor-pointer text-sm text-neutral-500 underline underline-offset-4 hover:text-neutral-900">
           O subí una foto de frente
           <input type="file" accept="image/*" capture="user" className="hidden" onChange={onFile} />
         </label>

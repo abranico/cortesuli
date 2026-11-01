@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0b0a09;
-  --foreground: #f2ede4;
+  --background: #f7f8f5;
+  --foreground: #14201a;
 }
 
 @theme inline {
@@ -13,18 +13,22 @@
   --font-display: var(--font-display-serif);
 }
 
-/* Acento bronce/latón para toda la app: bg-accent, text-accent, border-accent, etc. */
+/* Tema claro con acento verde para toda la app: bg-accent, text-accent, border-accent, etc.
+   - accent: verde principal (texto blanco encima con buen contraste).
+   - accent-strong: hover / estados presionados.
+   - accent-soft: fondo verde muy suave para chips y tarjetas destacadas.
+   - ink: texto oscuro principal. surface / surface-2: tarjetas sobre el fondo. */
 @theme {
-  --color-accent: #d6a04f;
-  --color-accent-soft: #f0cf93;
-  --color-accent-strong: #b9822f;
-  --color-ink: #0b0a09;
-  --color-surface: #151311;
-  --color-surface-2: #1e1b18;
+  --color-accent: #15803d;
+  --color-accent-strong: #166534;
+  --color-accent-soft: #dcfce7;
+  --color-ink: #14201a;
+  --color-surface: #ffffff;
+  --color-surface-2: #eef3ee;
 }
 
 html {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
@@ -33,6 +37,6 @@ body {
 }
 
 ::selection {
-  background: #d6a04f;
-  color: #0b0a09;
+  background: #bbf7d0;
+  color: #14201a;
 }

@@ -47,25 +47,25 @@ export default function AppointmentCard({ appointment: a }: { appointment: Appoi
   return (
     <article
       className={`rounded-2xl border p-4 transition ${
-        cancelled ? "border-white/5 bg-white/[0.02] opacity-60" : "border-white/10 bg-white/5"
+        cancelled ? "border-neutral-200 bg-neutral-50 opacity-60" : "border-neutral-200 bg-white shadow-sm"
       }`}
     >
       <div className="flex flex-col gap-4 sm:flex-row">
         <div className="flex shrink-0 flex-row items-baseline gap-2 sm:w-20 sm:flex-col sm:gap-0">
           <p className="text-2xl font-bold tabular-nums">{time(a.start)}</p>
-          <p className="text-xs text-zinc-500">a {time(a.end)}</p>
+          <p className="text-xs text-neutral-500">a {time(a.end)}</p>
         </div>
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h4 className="text-base font-semibold">{a.customerName}</h4>
             {cancelled ? (
-              <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-xs text-red-300">Cancelado</span>
+              <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Cancelado</span>
             ) : a.cutName ? (
-              <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-xs text-amber-300">Reservado con IA</span>
+              <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent-strong">Reservado con IA</span>
             ) : null}
           </div>
-          <p className="text-sm text-zinc-400">
+          <p className="text-sm text-neutral-500">
             {a.customerPhone && <a href={`tel:${a.customerPhone.replace(/\s/g, "")}`}>{a.customerPhone}</a>}
             {a.customerPhone && " · "}
             {a.serviceName} con {a.stylistName}
@@ -73,21 +73,21 @@ export default function AppointmentCard({ appointment: a }: { appointment: Appoi
 
           {a.cutName && (
             <div className="mt-3">
-              <p className="text-sm font-medium text-amber-300">✂ {a.cutName}</p>
-              {a.cutDescription && <p className="mt-0.5 text-sm text-zinc-300">{a.cutDescription}</p>}
+              <p className="text-sm font-medium text-accent">✂ {a.cutName}</p>
+              {a.cutDescription && <p className="mt-0.5 text-sm text-neutral-700">{a.cutDescription}</p>}
             </div>
           )}
 
           {a.productNames.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-1.5">
               {a.productNames.map((p) => (
-                <span key={p} className="rounded-md bg-white/10 px-2 py-0.5 text-xs text-zinc-300">
+                <span key={p} className="rounded-md bg-neutral-100 px-2 py-0.5 text-xs text-neutral-700">
                   {p}
                 </span>
               ))}
             </div>
           )}
-          {a.notes && <p className="mt-2 text-xs text-zinc-500">{a.notes}</p>}
+          {a.notes && <p className="mt-2 text-xs text-neutral-500">{a.notes}</p>}
         </div>
 
         <div className="flex shrink-0 flex-col gap-3 sm:items-end">
@@ -99,7 +99,7 @@ export default function AppointmentCard({ appointment: a }: { appointment: Appoi
                   key={key}
                   type="button"
                   onClick={() => setZoom({ src, label })}
-                  className="group relative h-16 w-16 overflow-hidden rounded-lg border border-white/10"
+                  className="group relative h-16 w-16 overflow-hidden rounded-lg border border-neutral-200"
                   title={`Ver ${label}`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -109,7 +109,7 @@ export default function AppointmentCard({ appointment: a }: { appointment: Appoi
               ) : (
                 <div
                   key={key}
-                  className="flex h-16 w-16 flex-col items-center justify-center rounded-lg border border-dashed border-white/15 bg-white/[0.03] text-zinc-600"
+                  className="flex h-16 w-16 flex-col items-center justify-center rounded-lg border border-dashed border-neutral-300 bg-neutral-50 text-neutral-400"
                 >
                   <span className="text-lg">✂</span>
                   <span className="text-[10px]">{label}</span>
@@ -122,7 +122,7 @@ export default function AppointmentCard({ appointment: a }: { appointment: Appoi
               type="button"
               onClick={cancel}
               disabled={pending}
-              className="rounded-lg border border-red-400/30 px-3 py-1.5 text-sm text-red-300 transition hover:bg-red-500/10 disabled:opacity-50"
+              className="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm text-red-700 transition hover:bg-red-50 disabled:opacity-50"
             >
               {pending ? "Cancelando…" : "Cancelar"}
             </button>
@@ -133,7 +133,7 @@ export default function AppointmentCard({ appointment: a }: { appointment: Appoi
       {message && (
         <p
           className={`mt-3 rounded-lg px-3 py-2 text-sm ${
-            message.tone === "ok" ? "bg-emerald-500/10 text-emerald-300" : "bg-red-500/10 text-red-300"
+            message.tone === "ok" ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"
           }`}
         >
           {message.text}
@@ -150,11 +150,11 @@ export default function AppointmentCard({ appointment: a }: { appointment: Appoi
           <figure className="max-h-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={zoom.src} alt={zoom.label} className="max-h-[80vh] w-auto rounded-xl" />
-            <figcaption className="mt-2 flex items-center justify-between text-sm text-zinc-300">
+            <figcaption className="mt-2 flex items-center justify-between text-sm text-white">
               <span>
                 {a.cutName} · {zoom.label}
               </span>
-              <button type="button" onClick={() => setZoom(null)} className="rounded-md bg-white/10 px-3 py-1 hover:bg-white/20">
+              <button type="button" onClick={() => setZoom(null)} className="rounded-md bg-white/15 px-3 py-1 text-white hover:bg-white/25">
                 Cerrar
               </button>
             </figcaption>

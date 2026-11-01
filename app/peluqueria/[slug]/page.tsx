@@ -40,7 +40,7 @@ const STEPS = [
     text: "Frente, perfil y nuca. Además, tips de peinado, productos que te sirven y cada cuánto conviene volver.",
   },
   {
-    title: "Reservá con el peluquero ideal",
+    title: "Reservá tu turno",
     text: "Elegís horario y te asignamos a quien mejor hace ese corte. Tu peluquero ve la foto exacta de lo que querés.",
   },
 ];
@@ -58,8 +58,8 @@ export default async function SalonPage({ params }: Props) {
     <main className="flex-1">
       {/* Hero */}
       <section className="relative overflow-hidden">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(214,160,79,0.18),transparent_60%)]" />
-        <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(135deg,transparent_0_22px,rgba(242,237,228,0.025)_22px_23px)]" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(21,128,61,0.12),transparent_60%)]" />
+        <div className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(135deg,transparent_0_22px,rgba(20,32,26,0.025)_22px_23px)]" />
         <div className="relative mx-auto grid max-w-6xl gap-10 px-5 pb-16 pt-10 sm:px-8 lg:grid-cols-[1.2fr_1fr] lg:items-center lg:pb-24 lg:pt-16">
           <div>
             <div className="flex items-center gap-3 text-sm text-foreground/60">
@@ -146,13 +146,13 @@ export default async function SalonPage({ params }: Props) {
           />
           <ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {stylists.map((st) => (
-              <li key={st.id} className="rounded-2xl border border-foreground/10 bg-surface p-6">
+              <li key={st.id} className="rounded-2xl border border-foreground/10 bg-surface p-6 shadow-sm">
                 <div className="flex items-center gap-4">
                   {st.avatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={st.avatarUrl} alt={st.name} className="h-14 w-14 rounded-full object-cover" />
                   ) : (
-                    <span className="grid h-14 w-14 place-items-center rounded-full border border-accent/50 bg-gradient-to-br from-accent/30 to-surface-2 font-display text-xl font-semibold text-accent-soft">
+                    <span className="grid h-14 w-14 place-items-center rounded-full border border-accent/50 bg-gradient-to-br from-accent-soft to-surface-2 font-display text-xl font-semibold text-accent">
                       {initials(st.name)}
                     </span>
                   )}
@@ -218,7 +218,7 @@ export default async function SalonPage({ params }: Props) {
       {/* CTA final */}
       <section className="border-t border-foreground/10">
         <div className="mx-auto max-w-6xl px-5 py-16 sm:px-8">
-          <div className="relative overflow-hidden rounded-3xl border border-accent/30 bg-gradient-to-br from-accent/20 via-surface to-surface p-8 sm:p-12">
+          <div className="relative overflow-hidden rounded-3xl border border-accent/30 bg-gradient-to-br from-accent-soft via-surface to-surface p-8 sm:p-12">
             <Eyebrow>Tu próximo corte</Eyebrow>
             <h2 className="mt-3 max-w-xl font-display text-3xl font-semibold leading-tight sm:text-4xl">
               Probátelo primero. Reservá después.
@@ -235,7 +235,7 @@ export default async function SalonPage({ params }: Props) {
           <p>
             {salon.name} · Reservas con{" "}
             <Link href="/" className="text-foreground/70 hover:text-accent">
-              Espejo
+              Cortesuli
             </Link>
           </p>
           <Link href="/admin" className="text-xs hover:text-accent">

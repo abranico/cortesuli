@@ -8,7 +8,7 @@ export default async function ReservarPage({ params }: { params: Promise<{ slug:
   if (!salon) notFound();
   const catalog = await getSalonCatalog(salon.id);
   return (
-    <main className="min-h-screen bg-background text-neutral-100">
+    <main className="min-h-screen bg-background text-foreground">
       <ReservaFlow salon={salon} catalog={catalog} />
     </main>
   );

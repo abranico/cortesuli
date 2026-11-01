@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentAdmin, getSalonCatalog, listAppointments, listWaitlist } from "@/lib/data";
 import { logoutAction } from "../actions";
 import AppointmentCard, { type AppointmentView } from "@/components/admin/AppointmentCard";
+import { Logo } from "@/components/landing/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -77,25 +78,26 @@ export default async function AdminPanelPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-6">
+    <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
+      <Logo className="mb-6" />
+      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-neutral-200 pb-6">
         <div>
-          <p className="text-xs font-medium uppercase tracking-widest text-amber-400">Panel de la peluquería</p>
+          <p className="text-xs font-medium uppercase tracking-widest text-accent">Panel de la peluquería</p>
           <h1 className="mt-1 text-2xl font-bold sm:text-3xl">{salon.name}</h1>
-          <p className="text-sm text-zinc-400">
+          <p className="text-sm text-neutral-500">
             {salon.address} · {salon.city}
           </p>
         </div>
         <div className="flex items-center gap-3">
           <a
             href={`/peluqueria/${salon.slug}`}
-            className="rounded-lg border border-white/15 px-3 py-2 text-sm transition hover:bg-white/10"
+            className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm transition hover:bg-neutral-100"
           >
             Ver página pública
           </a>
-          <span className="hidden text-sm text-zinc-400 sm:inline">{admin.email}</span>
+          <span className="hidden text-sm text-neutral-500 sm:inline">{admin.email}</span>
           <form action={logoutAction}>
-            <button className="rounded-lg bg-white/10 px-3 py-2 text-sm font-medium transition hover:bg-white/20">
+            <button className="rounded-lg bg-neutral-100 px-3 py-2 text-sm font-medium transition hover:bg-neutral-200">
               Cerrar sesión
             </button>
           </form>
@@ -104,9 +106,9 @@ export default async function AdminPanelPage() {
 
       <section className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {metrics.map((m) => (
-          <div key={m.label} className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <p className="text-xs text-zinc-400">{m.label}</p>
-            <p className="mt-1 text-2xl font-bold text-amber-400">{m.value}</p>
+          <div key={m.label} className="rounded-2xl border border-neutral-200 bg-white shadow-sm p-4">
+            <p className="text-xs text-neutral-500">{m.label}</p>
+            <p className="mt-1 text-2xl font-bold text-accent">{m.value}</p>
           </div>
         ))}
       </section>
@@ -115,16 +117,16 @@ export default async function AdminPanelPage() {
         <section>
           <h2 className="text-lg font-semibold">Agenda</h2>
           {groups.size === 0 && (
-            <p className="mt-4 rounded-xl border border-dashed border-white/15 p-6 text-center text-sm text-zinc-400">
+            <p className="mt-4 rounded-xl border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-500">
               Todavía no hay turnos próximos.
             </p>
           )}
           <div className="mt-4 space-y-8">
             {[...groups.entries()].map(([key, items]) => (
               <div key={key}>
-                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-400">
+                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-neutral-500">
                   {dayLabel(key, todayKey, tomorrowKey)}{" "}
-                  <span className="font-normal normal-case text-zinc-500">
+                  <span className="font-normal normal-case text-neutral-500">
                     · {items.filter((i) => i.status === "confirmado").length} turnos
                   </span>
                 </h3>
@@ -140,24 +142,24 @@ export default async function AdminPanelPage() {
 
         <aside>
           <h2 className="text-lg font-semibold">Lista de espera</h2>
-          <p className="mt-1 text-xs text-zinc-500">Cuando cancelás un turno, se le ofrece al primero de la lista.</p>
+          <p className="mt-1 text-xs text-neutral-500">Cuando cancelás un turno, se le ofrece al primero de la lista.</p>
           <ul className="mt-4 space-y-2">
-            {waitlist.length === 0 && <li className="text-sm text-zinc-400">Nadie en espera.</li>}
+            {waitlist.length === 0 && <li className="text-sm text-neutral-500">Nadie en espera.</li>}
             {waitlist.map((w) => (
-              <li key={w.id} className="rounded-xl border border-white/10 bg-white/5 p-3">
+              <li key={w.id} className="rounded-xl border border-neutral-200 bg-white shadow-sm p-3">
                 <div className="flex items-center justify-between gap-2">
                   <p className="font-medium">{w.customerName}</p>
                   <span
                     className={
                       w.status === "esperando"
-                        ? "rounded-full bg-amber-400/15 px-2 py-0.5 text-xs text-amber-300"
-                        : "rounded-full bg-emerald-400/15 px-2 py-0.5 text-xs text-emerald-300"
+                        ? "rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800"
+                        : "rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800"
                     }
                   >
                     {w.status === "esperando" ? "Esperando" : "Turno ofrecido"}
                   </span>
                 </div>
-                <p className="mt-1 text-xs text-zinc-400">
+                <p className="mt-1 text-xs text-neutral-500">
                   {w.customerPhone}
                   {w.serviceId && services.get(w.serviceId) ? ` · ${services.get(w.serviceId)!.name}` : ""}
                 </p>

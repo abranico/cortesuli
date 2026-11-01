@@ -28,12 +28,12 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
 function CutImage({ state, alt }: { state: ImgState | undefined; alt: string }) {
   if (!state || state === "loading")
     return (
-      <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-surface">
+      <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-surface-2">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
-        <span className="text-xs text-neutral-400">Probándote el corte...</span>
+        <span className="text-xs text-neutral-500">Probándote el corte...</span>
       </div>
     );
-  if (state === "error") return <div className="flex h-full w-full items-center justify-center bg-surface text-xs text-neutral-500">No se pudo generar</div>;
+  if (state === "error") return <div className="flex h-full w-full items-center justify-center bg-surface-2 text-xs text-neutral-500">No se pudo generar</div>;
   // eslint-disable-next-line @next/next/no-img-element
   return <img src={state} alt={alt} className="h-full w-full object-cover" />;
 }
@@ -208,22 +208,22 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6">
       <header className="flex items-center justify-between">
-        <Link href={`/peluqueria/${salon.slug}`} className="text-sm text-neutral-400 hover:text-neutral-200">
+        <Link href={`/peluqueria/${salon.slug}`} className="text-sm text-neutral-500 hover:text-neutral-900">
           ← {salon.name}
         </Link>
         <span className="text-xs uppercase tracking-widest text-accent">Probador IA</span>
       </header>
 
-      {error && <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">{error}</div>}
+      {error && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
       {step === "intro" && (
         <section className="flex flex-col gap-6 pt-6 text-center">
           <h1 className="font-display text-3xl font-bold sm:text-4xl">Probate tu próximo corte antes de sentarte en el sillón</h1>
-          <p className="text-neutral-400">
+          <p className="text-neutral-500">
             Te sacamos 3 fotos girando la cabeza, la IA analiza tu cara y te muestra 3 cortes que te quedan bien. Elegís uno, lo ves desde todos
-            los ángulos y reservás con el peluquero ideal.
+            los ángulos y reservás tu turno en el momento.
           </p>
-          <button onClick={() => setStep("captura")} className="rounded-full bg-accent px-6 py-4 text-lg font-semibold text-ink hover:bg-accent-soft">
+          <button onClick={() => setStep("captura")} className="rounded-full bg-accent px-6 py-4 text-lg font-semibold text-white hover:bg-accent-strong">
             Abrir cámara
           </button>
           <p className="text-xs text-neutral-500">Tus fotos solo se usan para generar las propuestas y para que tu peluquero vea el corte elegido.</p>
@@ -239,18 +239,18 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
             <img src={photos.front} alt="" className="h-40 w-40 animate-pulse rounded-full object-cover ring-4 ring-accent/60" />
           )}
           <h2 className="text-2xl font-semibold">Analizando tu cara...</h2>
-          <p className="text-neutral-400">Forma de cara, tipo de pelo y qué cortes del local te favorecen.</p>
+          <p className="text-neutral-500">Forma de cara, tipo de pelo y qué cortes del local te favorecen.</p>
         </section>
       )}
 
       {step === "elegir" && analysis && (
         <section className="flex flex-col gap-5">
-          <div className="rounded-2xl border border-neutral-800 bg-surface/60 p-4">
+          <div className="rounded-2xl border border-neutral-200 bg-surface shadow-sm p-4">
             <p className="text-xs uppercase tracking-widest text-accent">Tu diagnóstico</p>
-            <p className="mt-1 text-sm text-neutral-300">
+            <p className="mt-1 text-sm text-neutral-600">
               Cara <b>{analysis.faceShape}</b> · {analysis.hairType}
             </p>
-            <p className="mt-2 text-neutral-200">{analysis.summary}</p>
+            <p className="mt-2 text-neutral-800">{analysis.summary}</p>
           </div>
           <h2 className="text-2xl font-bold">Elegí tu corte</h2>
           <div className="grid gap-4 sm:grid-cols-3">
@@ -259,30 +259,30 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
                 key={i}
                 onClick={() => choose(i)}
                 disabled={previews[i] === "loading"}
-                className="group flex flex-col overflow-hidden rounded-2xl border border-neutral-800 bg-surface text-left transition hover:border-accent disabled:cursor-wait"
+                className="group flex flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-surface text-left transition hover:border-accent disabled:cursor-wait"
               >
                 <div className="aspect-square w-full">
                   <CutImage state={previews[i]} alt={c.name} />
                 </div>
                 <div className="flex flex-col gap-1 p-3">
                   <span className="font-semibold group-hover:text-accent">{c.name}</span>
-                  <span className="text-xs text-neutral-400">{c.why}</span>
+                  <span className="text-xs text-neutral-500">{c.why}</span>
                 </div>
               </button>
             ))}
           </div>
-          <div className="flex flex-col gap-2 rounded-2xl border border-neutral-800 p-4">
-            <label className="text-sm text-neutral-300">¿Tenías otra idea? Contale a la IA qué querés</label>
+          <div className="flex flex-col gap-2 rounded-2xl border border-neutral-200 p-4">
+            <label className="text-sm text-neutral-600">¿Tenías otra idea? Contale a la IA qué querés</label>
             <div className="flex gap-2">
               <input
                 value={wish}
                 onChange={(e) => setWish(e.target.value)}
                 placeholder="Ej: más corto a los costados, tipo degradé con barba"
-                className="flex-1 rounded-xl border border-neutral-700 bg-background px-3 py-2 text-sm outline-none focus:border-accent"
+                className="flex-1 rounded-xl border border-neutral-300 bg-white px-3 py-2 text-sm outline-none focus:border-accent"
               />
               <button
                 onClick={() => photos && wish.trim() && analyze(photos, wish.trim())}
-                className="rounded-xl bg-neutral-800 px-4 text-sm font-medium hover:bg-neutral-700"
+                className="rounded-xl bg-neutral-100 px-4 text-sm font-medium text-neutral-800 hover:bg-neutral-200"
               >
                 Probar
               </button>
@@ -293,11 +293,11 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
 
       {step === "detalle" && cut && (
         <section className="flex flex-col gap-5">
-          <button onClick={() => setStep("elegir")} className="self-start text-sm text-neutral-400 hover:text-neutral-200">
+          <button onClick={() => setStep("elegir")} className="self-start text-sm text-neutral-500 hover:text-neutral-900">
             ← Ver los otros cortes
           </button>
           <h2 className="text-3xl font-bold">{cut.name}</h2>
-          <div className="aspect-square w-full overflow-hidden rounded-3xl border border-neutral-800">
+          <div className="aspect-square w-full overflow-hidden rounded-3xl border border-neutral-200">
             <CutImage state={view === "front" ? previews[selected] : angles[view]} alt={`${cut.name} - ${VIEW_LABEL[view]}`} />
           </div>
           <div className="grid grid-cols-4 gap-2">
@@ -305,7 +305,7 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
               <button
                 key={v}
                 onClick={() => setView(v)}
-                className={`flex flex-col overflow-hidden rounded-xl border text-xs ${view === v ? "border-accent" : "border-neutral-800"}`}
+                className={`flex flex-col overflow-hidden rounded-xl border text-xs ${view === v ? "border-accent" : "border-neutral-200"}`}
               >
                 <div className="aspect-square w-full">
                   <CutImage state={v === "front" ? previews[selected] : angles[v]} alt={VIEW_LABEL[v]} />
@@ -316,22 +316,22 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-2xl border border-neutral-800 bg-surface/60 p-4">
+            <div className="rounded-2xl border border-neutral-200 bg-surface shadow-sm p-4">
               <p className="text-xs uppercase tracking-widest text-accent">Por qué te queda bien</p>
-              <p className="mt-2 text-neutral-200">{cut.why}</p>
+              <p className="mt-2 text-neutral-800">{cut.why}</p>
               <p className="mt-3 text-xs uppercase tracking-widest text-accent">Cómo mantenerlo</p>
-              <ul className="mt-2 flex list-disc flex-col gap-1 pl-5 text-sm text-neutral-300">
+              <ul className="mt-2 flex list-disc flex-col gap-1 pl-5 text-sm text-neutral-600">
                 {cut.careTips.map((t) => (
                   <li key={t}>{t}</li>
                 ))}
               </ul>
-              <p className="mt-3 text-sm text-neutral-300">
+              <p className="mt-3 text-sm text-neutral-600">
                 Conviene retocarlo cada <b>{cut.retouchWeeks} semanas</b>.
               </p>
             </div>
-            <div className="flex flex-col gap-3 rounded-2xl border border-neutral-800 bg-surface/60 p-4">
+            <div className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-surface shadow-sm p-4">
               <p className="text-xs uppercase tracking-widest text-accent">Lo tenemos en el local</p>
-              {cut.productIds.length === 0 && <p className="text-sm text-neutral-400">Este corte no necesita productos especiales.</p>}
+              {cut.productIds.length === 0 && <p className="text-sm text-neutral-500">Este corte no necesita productos especiales.</p>}
               {cut.productIds.map((id) => {
                 const p = catalog.products.find((x) => x.id === id);
                 return (
@@ -339,20 +339,20 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
                     <div key={id} className="flex items-start justify-between gap-3">
                       <div>
                         <p className="font-medium">{p.name}</p>
-                        <p className="text-xs text-neutral-400">{p.description}</p>
+                        <p className="text-xs text-neutral-500">{p.description}</p>
                       </div>
                       <span className="whitespace-nowrap text-sm text-accent">{money(p.price)}</span>
                     </div>
                   )
                 );
               })}
-              <p className="mt-auto text-sm text-neutral-300">
+              <p className="mt-auto text-sm text-neutral-600">
                 Te recomendamos a <b>{stylistName(cut.stylistId)}</b> para este corte.
               </p>
             </div>
           </div>
 
-          <button onClick={goReserva} className="rounded-full bg-accent px-6 py-4 text-lg font-semibold text-ink hover:bg-accent-soft">
+          <button onClick={goReserva} className="rounded-full bg-accent px-6 py-4 text-lg font-semibold text-white hover:bg-accent-strong">
             Reservar este corte
           </button>
         </section>
@@ -360,7 +360,7 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
 
       {step === "reserva" && cut && (
         <section className="flex flex-col gap-5">
-          <button onClick={() => setStep("detalle")} className="self-start text-sm text-neutral-400 hover:text-neutral-200">
+          <button onClick={() => setStep("detalle")} className="self-start text-sm text-neutral-500 hover:text-neutral-900">
             ← Volver al corte
           </button>
           <div className="flex items-center gap-4">
@@ -370,7 +370,7 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
             <div>
               <h2 className="text-2xl font-bold">Reservá tu {cut.name.toLowerCase()}</h2>
               {service && (
-                <p className="text-sm text-neutral-400">
+                <p className="text-sm text-neutral-500">
                   {service.name} · {service.durationMin} min · {money(service.price)}
                 </p>
               )}
@@ -378,7 +378,7 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="flex flex-col gap-1 text-sm text-neutral-300">
+            <label className="flex flex-col gap-1 text-sm text-neutral-600">
               Servicio
               <select
                 value={serviceId}
@@ -386,7 +386,7 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
                   setServiceId(e.target.value);
                   loadSlots(e.target.value, stylistId);
                 }}
-                className="rounded-xl border border-neutral-700 bg-background px-3 py-2"
+                className="rounded-xl border border-neutral-300 bg-white px-3 py-2"
               >
                 {catalog.services.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -395,7 +395,7 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
                 ))}
               </select>
             </label>
-            <label className="flex flex-col gap-1 text-sm text-neutral-300">
+            <label className="flex flex-col gap-1 text-sm text-neutral-600">
               Peluquero
               <select
                 value={stylistId}
@@ -403,7 +403,7 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
                   setStylistId(e.target.value);
                   loadSlots(serviceId, e.target.value);
                 }}
-                className="rounded-xl border border-neutral-700 bg-background px-3 py-2"
+                className="rounded-xl border border-neutral-300 bg-white px-3 py-2"
               >
                 <option value="">Cualquiera</option>
                 {catalog.stylists.map((s) => (
@@ -417,7 +417,7 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
           </div>
 
           {!slots ? (
-            <p className="text-sm text-neutral-400">Buscando horarios...</p>
+            <p className="text-sm text-neutral-500">Buscando horarios...</p>
           ) : (
             <>
               <div className="flex gap-2 overflow-x-auto pb-1">
@@ -431,7 +431,7 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
                         setSlot(null);
                       }}
                       className={`whitespace-nowrap rounded-full border px-4 py-2 text-sm capitalize ${
-                        day === d ? "border-accent bg-accent text-ink" : "border-neutral-700"
+                        day === d ? "border-accent bg-accent text-white" : "border-neutral-300"
                       }`}
                     >
                       {dayLabel(first.start)}
@@ -444,12 +444,12 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
                   <button
                     key={s.start}
                     onClick={() => setSlot(s)}
-                    className={`rounded-xl border py-2 text-sm ${slot?.start === s.start ? "border-accent bg-accent/20 text-accent-soft" : "border-neutral-800 hover:border-neutral-600"}`}
+                    className={`rounded-xl border py-2 text-sm ${slot?.start === s.start ? "border-accent bg-accent-soft text-accent-strong font-semibold" : "border-neutral-200 hover:border-neutral-400"}`}
                   >
                     {timeLabel(s.start)}
                   </button>
                 ))}
-                {daySlots.length === 0 && <p className="col-span-full text-sm text-neutral-400">No hay horarios disponibles.</p>}
+                {daySlots.length === 0 && <p className="col-span-full text-sm text-neutral-500">No hay horarios disponibles.</p>}
               </div>
             </>
           )}
@@ -459,32 +459,32 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Tu nombre"
-              className="rounded-xl border border-neutral-700 bg-background px-3 py-3 outline-none focus:border-accent"
+              className="rounded-xl border border-neutral-300 bg-white px-3 py-3 outline-none focus:border-accent"
             />
             <input
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="Tu WhatsApp"
               inputMode="tel"
-              className="rounded-xl border border-neutral-700 bg-background px-3 py-3 outline-none focus:border-accent"
+              className="rounded-xl border border-neutral-300 bg-white px-3 py-3 outline-none focus:border-accent"
             />
           </div>
 
           <button
             onClick={confirm}
             disabled={!slot || !name.trim() || !phone.trim() || booking}
-            className="rounded-full bg-accent px-6 py-4 text-lg font-semibold text-ink hover:bg-accent-soft disabled:opacity-40"
+            className="rounded-full bg-accent px-6 py-4 text-lg font-semibold text-white hover:bg-accent-strong disabled:opacity-40"
           >
             {booking ? "Reservando..." : slot ? `Confirmar ${dayLabel(slot.start)} ${timeLabel(slot.start)} con ${stylistName(slot.stylistId)}` : "Elegí un horario"}
           </button>
 
           {waitlisted ? (
-            <p className="text-center text-sm text-emerald-400">Listo, quedaste en la lista de espera. Si se libera un turno te avisamos por WhatsApp.</p>
+            <p className="text-center text-sm text-emerald-700">Listo, quedaste en la lista de espera. Si se libera un turno te avisamos por WhatsApp.</p>
           ) : (
             <button
               onClick={joinWaitlist}
               disabled={!name.trim() || !phone.trim()}
-              className="text-sm text-neutral-400 underline underline-offset-4 hover:text-neutral-200 disabled:no-underline disabled:opacity-50"
+              className="text-sm text-neutral-500 underline underline-offset-4 hover:text-neutral-900 disabled:no-underline disabled:opacity-50"
             >
               ¿No te sirve ningún horario? Anotate en la lista de espera
             </button>
@@ -494,40 +494,40 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
 
       {step === "listo" && appointment && cut && (
         <section className="flex flex-col items-center gap-5 text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/20 text-3xl text-emerald-400">✓</div>
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-3xl text-emerald-700">✓</div>
           <h2 className="text-3xl font-bold">¡Turno confirmado!</h2>
-          <p className="text-neutral-300">
+          <p className="text-neutral-600">
             {name.split(" ")[0]}, te esperamos el <b>{fullLabel(appointment.start)}</b> con <b>{stylistName(appointment.stylistId)}</b> en {salon.address}.
           </p>
-          <div className="w-full max-w-xs overflow-hidden rounded-3xl border border-neutral-800">
+          <div className="w-full max-w-xs overflow-hidden rounded-3xl border border-neutral-200">
             <div className="aspect-square">
               <CutImage state={previews[selected]} alt={cut.name} />
             </div>
-            <p className="p-3 text-sm text-neutral-300">
+            <p className="p-3 text-sm text-neutral-600">
               {stylistName(appointment.stylistId)} ya tiene la foto de tu <b>{cut.name}</b> desde todos los ángulos.
             </p>
           </div>
 
-          <div className="w-full rounded-2xl border border-accent/40 bg-accent/5 p-4">
+          <div className="w-full rounded-2xl border border-accent/40 bg-accent-soft/50 p-4">
             {retouch === null && (
               <>
-                <p className="text-neutral-200">
+                <p className="text-neutral-800">
                   Este corte se retoca cada <b>{cut.retouchWeeks} semanas</b>. ¿Te dejamos reservado el retoque?
                 </p>
-                <button onClick={bookRetouch} className="mt-3 rounded-full bg-accent px-5 py-2 font-semibold text-ink hover:bg-accent-soft">
+                <button onClick={bookRetouch} className="mt-3 rounded-full bg-accent px-5 py-2 font-semibold text-white hover:bg-accent-strong">
                   Sí, reservame el retoque
                 </button>
               </>
             )}
-            {retouch === "loading" && <p className="text-neutral-300">Buscando el mejor horario...</p>}
-            {retouch === "none" && <p className="text-neutral-300">No encontramos un horario para el retoque todavía. Te escribimos cuando se acerque la fecha.</p>}
+            {retouch === "loading" && <p className="text-neutral-600">Buscando el mejor horario...</p>}
+            {retouch === "none" && <p className="text-neutral-600">No encontramos un horario para el retoque todavía. Te escribimos cuando se acerque la fecha.</p>}
             {retouch && typeof retouch === "object" && (
-              <p className="text-emerald-400">
+              <p className="text-emerald-700">
                 Retoque reservado para el {fullLabel(retouch.start)} con {stylistName(retouch.stylistId)}.
               </p>
             )}
           </div>
-          <Link href={`/peluqueria/${salon.slug}`} className="text-sm text-neutral-400 underline underline-offset-4">
+          <Link href={`/peluqueria/${salon.slug}`} className="text-sm text-neutral-500 underline underline-offset-4">
             Volver a {salon.name}
           </Link>
         </section>
