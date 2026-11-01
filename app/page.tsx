@@ -25,7 +25,7 @@ const PAINS = [
 const FEATURES = [
   {
     title: "Probador de cortes con IA (opcional)",
-    text: "Si quiere, el cliente se saca una selfie girando la cabeza y ve 3 cortes sugeridos sobre su propia cara, desde frente, perfil y nuca.",
+    text: "Si quiere, el cliente se saca una selfie girando la cabeza y ve 3 cortes sugeridos sobre su propia cara, de frente y de perfil.",
   },
   {
     title: "Agenda con la foto del corte",

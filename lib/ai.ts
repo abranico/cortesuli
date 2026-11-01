@@ -25,7 +25,7 @@ export type FaceAnalysis = {
   cuts: CutSuggestion[];
 };
 
-export type CutView = "front" | "left" | "right" | "back";
+export type CutView = "front" | "left" | "right";
 
 const analysisSchema = {
   type: "object",
@@ -94,7 +94,6 @@ const VIEW_INSTRUCTIONS: Record<CutView, string> = {
   front: "Keep the exact same photo, framing, pose, face, expression, skin, clothing and background.",
   left: "Keep the exact same photo, framing, head pose (profile view), face, clothing and background.",
   right: "Keep the exact same photo, framing, head pose (profile view), face, clothing and background.",
-  back: "Using the reference photos of this same person, create a realistic photo of the BACK of their head (rear view, nape visible, same lighting, neutral plain background) so the back of the haircut can be seen clearly.",
 };
 
 async function dataUrlToFile(dataUrl: string, name: string) {
@@ -108,7 +107,7 @@ export async function renderCut(images: string[], cutPrompt: string, view: CutVi
   const res = await openai().images.edit({
     model: IMAGE_MODEL,
     image: files.length === 1 ? files[0] : files,
-    prompt: `Photorealistic hairstyle try-on for a barbershop. Change ONLY the hair${view === "back" ? "" : " (and facial hair if mentioned)"} of the person to: ${cutPrompt}. ${VIEW_INSTRUCTIONS[view]} The result must look like a real photo, natural hairline, realistic texture.`,
+    prompt: `Photorealistic hairstyle try-on for a barbershop. Change ONLY the hair (and facial hair if mentioned) of the person to: ${cutPrompt}. ${VIEW_INSTRUCTIONS[view]} The result must look like a real photo, natural hairline, realistic texture.`,
     size: "1024x1024",
     quality: IMAGE_QUALITY,
     output_format: "jpeg",

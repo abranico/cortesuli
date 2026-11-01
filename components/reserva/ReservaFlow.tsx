@@ -24,7 +24,7 @@ const dayLabel = (iso: string) => new Date(iso).toLocaleDateString("es-AR", { ti
 const timeLabel = (iso: string) => new Date(iso).toLocaleTimeString("es-AR", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
 const fullLabel = (iso: string) => `${new Date(iso).toLocaleDateString("es-AR", { timeZone: TZ, weekday: "long", day: "numeric", month: "long" })} a las ${timeLabel(iso)}`;
 
-const VIEW_LABEL: Record<CutView, string> = { front: "Frente", left: "Perfil izq.", right: "Perfil der.", back: "Nuca" };
+const VIEW_LABEL: Record<CutView, string> = { front: "Frente", left: "Perfil izq.", right: "Perfil der." };
 
 async function postJson<T>(url: string, body: unknown): Promise<T> {
   const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -77,7 +77,7 @@ export default function ReservaFlow({ salon, catalog, initialSlots }: { salon: S
   const [retouch, setRetouch] = useState<Appointment | "loading" | "none" | null>(null);
 
   const cut: CutSuggestion | undefined = analysis?.cuts[selected];
-  const availableViews: CutView[] = photos?.left ? ["front", "left", "right", "back"] : ["front", "back"];
+  const availableViews: CutView[] = photos?.left ? ["front", "left", "right"] : ["front"];
 
   const analyze = async (p: CapturedPhotos, w?: string) => {
     setStep("analizando");
@@ -110,13 +110,12 @@ export default function ReservaFlow({ salon, catalog, initialSlots }: { salon: S
     setSelected(i);
     setView("front");
     setStep("detalle");
-    const extra: CutView[] = photos.left ? ["left", "right", "back"] : ["back"];
+    const extra: CutView[] = photos.left ? ["left", "right"] : [];
     setAngles(Object.fromEntries(extra.map((v) => [v, "loading"])));
     const refs: Record<CutView, string[]> = {
       front: [photos.front],
       left: [photos.left ?? photos.front],
       right: [photos.right ?? photos.front],
-      back: [photos.front, photos.left, photos.right].filter((x): x is string => !!x),
     };
     extra.forEach((v) =>
       postJson<{ image: string }>("/api/ia/corte", { photos: refs[v], prompt: c.imagePrompt, view: v })
@@ -152,7 +151,7 @@ export default function ReservaFlow({ salon, catalog, initialSlots }: { salon: S
     const images: CutImages = {};
     const front = valid(previews[selected]);
     if (front) images.front = front;
-    for (const v of ["left", "right", "back"] as const) {
+    for (const v of ["left", "right"] as const) {
       const img = valid(angles[v]);
       if (img) images[v] = img;
     }
@@ -323,7 +322,7 @@ export default function ReservaFlow({ salon, catalog, initialSlots }: { salon: S
           <div className="aspect-square w-full overflow-hidden rounded-3xl border border-neutral-200">
             <CutImage state={view === "front" ? previews[selected] : angles[view]} alt={`${cut.name} - ${VIEW_LABEL[view]}`} />
           </div>
-          <div className="grid grid-cols-4 gap-2">
+          <div className={`grid grid-cols-3 gap-2 ${availableViews.length < 2 ? "hidden" : ""}`}>
             {availableViews.map((v) => (
               <button
                 key={v}

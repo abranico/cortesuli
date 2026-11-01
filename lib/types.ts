@@ -52,7 +52,6 @@ export type CutImages = {
   front?: string;
   left?: string;
   right?: string;
-  back?: string;
 };
 
 export type AppointmentStatus = "pendiente" | "completado";

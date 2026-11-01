@@ -2,7 +2,7 @@ import { renderCut, type CutView } from "@/lib/ai";
 
 export const maxDuration = 120;
 
-const VIEWS: CutView[] = ["front", "left", "right", "back"];
+const VIEWS: CutView[] = ["front", "left", "right"];
 
 export async function POST(req: Request) {
   const { photos, prompt, view } = (await req.json()) as { photos: string[]; prompt: string; view: CutView };
