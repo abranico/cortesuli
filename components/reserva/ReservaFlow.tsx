@@ -1,12 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import type { CutSuggestion, CutView, FaceAnalysis } from "@/lib/ai";
 import type { Appointment, CutImages, Salon, SalonCatalog, Slot } from "@/lib/types";
 import GuidedCapture, { type CapturedPhotos } from "./GuidedCapture";
 
-type Step = "inicio" | "captura" | "analizando" | "elegir" | "detalle" | "reserva" | "listo";
+type Step = "captura" | "analizando" | "elegir" | "detalle" | "reserva" | "listo";
 type ImgState = string | "loading" | "error";
 
 /** Corte probado con IA que el cliente agregó a su turno. */
@@ -54,8 +53,8 @@ function CutImage({ state, alt }: { state: ImgState | undefined; alt: string }) 
   return <img src={state} alt={alt} className="h-full w-full object-cover" />;
 }
 
-export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog: SalonCatalog }) {
-  const [step, setStep] = useState<Step>("inicio");
+export default function ReservaFlow({ salon, catalog, initialSlots }: { salon: Salon; catalog: SalonCatalog; initialSlots: Slot[] }) {
+  const [step, setStep] = useState<Step>("reserva");
   const [photos, setPhotos] = useState<CapturedPhotos | null>(null);
   const [analysis, setAnalysis] = useState<FaceAnalysis | null>(null);
   const [previews, setPreviews] = useState<ImgState[]>([]);
@@ -67,8 +66,9 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
 
   const [attached, setAttached] = useState<AttachedCut | null>(null);
   const [serviceId, setServiceId] = useState("");
-  const [slots, setSlots] = useState<Slot[] | null>(null);
-  const [day, setDay] = useState<string | null>(null);
+  const [description, setDescription] = useState("");
+  const [slots, setSlots] = useState<Slot[] | null>(initialSlots);
+  const [day, setDay] = useState<string | null>(initialSlots[0] ? dayKey(initialSlots[0].start) : null);
   const [slot, setSlot] = useState<Slot | null>(null);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -95,13 +95,13 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
-      setStep("inicio");
+      setStep("reserva");
     }
   };
 
   const onCaptured = (p: CapturedPhotos) => {
     setPhotos(p);
-    analyze(p);
+    analyze(p, description.trim() || undefined);
   };
 
   const choose = (i: number) => {
@@ -172,6 +172,11 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
     setStep(analysis ? "elegir" : "captura");
   };
 
+  const customerNote = description.trim();
+  const cutDescription = attached
+    ? [attached.description, customerNote && `Lo que pidió el cliente: ${customerNote}`].filter(Boolean).join("\n\n")
+    : customerNote;
+
   const book = async (start: string) =>
     (
       await postJson<{ appointment: Appointment }>("/api/turnos", {
@@ -181,7 +186,7 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
         customerPhone: phone,
         start,
         cutName: attached?.name ?? "",
-        cutDescription: attached?.description ?? "",
+        cutDescription,
         images: attached?.images ?? {},
         notes: attached?.notes ?? "",
       })
@@ -227,50 +232,20 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6">
-      <header className="flex items-center justify-between">
-        <Link href={`/peluqueria/${salon.slug}`} className="text-sm text-neutral-500 hover:text-neutral-900">
-          ← {salon.name}
-        </Link>
-        <span className="text-xs uppercase tracking-widest text-accent">Reservá tu turno</span>
+      <header className="border-b border-neutral-200 pb-4">
+        <p className="text-xs uppercase tracking-widest text-accent">Reservá tu turno</p>
+        <h1 className="mt-1 font-display text-3xl font-bold sm:text-4xl">{salon.name}</h1>
+        <p className="mt-1 text-sm text-neutral-500">
+          {salon.address} · {salon.city}
+          {salon.hours && ` · ${salon.hours}`}
+        </p>
       </header>
 
       {error && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
-      {step === "inicio" && (
-        <section className="flex flex-col gap-6 pt-4">
-          <div className="text-center">
-            <h1 className="font-display text-3xl font-bold sm:text-4xl">¿Qué querés hacer?</h1>
-            <p className="mt-2 text-neutral-500">Reservá directo, o si tenés ganas probate antes un corte con IA. Es opcional.</p>
-          </div>
-          <button
-            onClick={goReserva}
-            className="flex flex-col gap-1 rounded-3xl bg-accent px-6 py-6 text-left text-white shadow-sm shadow-accent/30 transition hover:bg-accent-strong"
-          >
-            <span className="text-2xl font-semibold">Reservar turno</span>
-            <span className="text-sm text-white/85">Elegís día y horario, y listo. Te lleva un minuto.</span>
-          </button>
-          <button
-            onClick={() => setStep("captura")}
-            className="flex flex-col gap-1 rounded-3xl border border-neutral-200 bg-surface px-6 py-6 text-left transition hover:border-accent"
-          >
-            <span className="flex items-center gap-2 text-xl font-semibold">
-              Probarme un corte con IA
-              <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent-strong">Opcional</span>
-            </span>
-            <span className="text-sm text-neutral-500">
-              Te sacamos 3 fotos girando la cabeza y la IA te muestra 3 cortes que te quedan bien, desde todos los ángulos. Si te gusta uno, lo
-              sumás a tu turno.
-            </span>
-          </button>
-          <p className="text-center text-xs text-neutral-500">
-            Si usás la IA, tus fotos solo se usan para generar las propuestas y para que el local vea el corte que elegiste.
-          </p>
-        </section>
-      )}
-
       {step === "captura" && (
         <section className="flex flex-col gap-4">
-          <button onClick={() => setStep("inicio")} className="self-start text-sm text-neutral-500 hover:text-neutral-900">
+          <button onClick={() => setStep("reserva")} className="self-start text-sm text-neutral-500 hover:text-neutral-900">
             ← Volver
           </button>
           <GuidedCapture onDone={onCaptured} />
@@ -334,7 +309,7 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
             </div>
           </div>
           <button onClick={goReserva} className="text-sm text-neutral-500 underline underline-offset-4 hover:text-neutral-900">
-            Seguir sin corte y reservar turno
+            Volver al formulario sin elegir corte
           </button>
         </section>
       )}
@@ -385,35 +360,7 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
 
       {step === "reserva" && (
         <section className="flex flex-col gap-5">
-          <button
-            onClick={() => setStep(attached && cut ? "detalle" : "inicio")}
-            className="self-start text-sm text-neutral-500 hover:text-neutral-900"
-          >
-            ← Volver
-          </button>
-          <h2 className="text-2xl font-bold">Elegí día y horario</h2>
-
-          {attached ? (
-            <div className="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-surface p-3">
-              <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-surface-2">
-                {attached.images.front && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={attached.images.front} alt={attached.name} className="h-full w-full object-cover" />
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs text-neutral-500">Corte agregado a tu turno</p>
-                <p className="truncate font-semibold">{attached.name}</p>
-              </div>
-              <button onClick={() => setAttached(null)} className="rounded-lg px-3 py-1.5 text-sm text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900">
-                Quitar
-              </button>
-            </div>
-          ) : (
-            <button onClick={tryCut} className="self-start text-sm text-accent underline-offset-4 hover:underline">
-              ¿Querés probarte un corte con IA antes? (opcional)
-            </button>
-          )}
+          <h2 className="text-xl font-semibold">Elegí día y horario</h2>
 
           {!slots ? (
             <p className="text-sm text-neutral-500">Buscando horarios...</p>
@@ -473,6 +420,56 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
               </select>
             </label>
           )}
+
+          <div className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-surface p-4">
+            <div>
+              <p className="font-semibold">¿Qué corte querés? <span className="text-sm font-normal text-neutral-500">(opcional)</span></p>
+              <p className="text-sm text-neutral-500">Describilo con tus palabras, o generá propuestas con IA sobre tu propia cara.</p>
+            </div>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              maxLength={1000}
+              placeholder="Ej: degradé bajo a los costados, arriba largo con textura y la barba prolija"
+              className="resize-none rounded-xl border border-neutral-300 bg-white px-3 py-2 text-sm outline-none focus:border-accent"
+            />
+            {attached ? (
+              <div className="flex flex-col gap-3 rounded-xl border border-accent/40 bg-accent-soft/40 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs text-neutral-500">Corte generado con IA</p>
+                    <p className="truncate font-semibold">{attached.name}</p>
+                  </div>
+                  <div className="flex shrink-0 gap-1">
+                    <button onClick={tryCut} className="rounded-lg px-3 py-1.5 text-sm text-neutral-600 hover:bg-white">
+                      Cambiar
+                    </button>
+                    <button onClick={() => setAttached(null)} className="rounded-lg px-3 py-1.5 text-sm text-neutral-600 hover:bg-white">
+                      Quitar
+                    </button>
+                  </div>
+                </div>
+                {attached.images.front && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={attached.images.front} alt={attached.name} className="aspect-square w-full max-w-xs rounded-xl object-cover" />
+                )}
+              </div>
+            ) : (
+              <button
+                onClick={tryCut}
+                className="flex items-center justify-center gap-2 rounded-xl border border-accent px-4 py-3 text-sm font-semibold text-accent transition hover:bg-accent-soft"
+              >
+                Generar mi corte con IA
+              </button>
+            )}
+            {!attached && (
+              <p className="text-xs text-neutral-500">
+                Con IA te sacamos 3 fotos girando la cabeza y te mostramos 3 cortes. Si escribiste una descripción, la usamos como guía. Tus fotos
+                solo se usan para generar las propuestas y para que el local vea el corte que elegiste.
+              </p>
+            )}
+          </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <input
@@ -544,9 +541,9 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
               </div>
             </>
           )}
-          <Link href={`/peluqueria/${salon.slug}`} className="text-sm text-neutral-500 underline underline-offset-4">
-            Volver a {salon.name}
-          </Link>
+          <button onClick={() => window.location.reload()} className="text-sm text-neutral-500 underline underline-offset-4">
+            Reservar otro turno
+          </button>
         </section>
       )}
     </div>
