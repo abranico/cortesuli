@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { assignStylistAction, cancelAppointmentAction, completeAppointmentAction, type ActionResult } from "@/app/admin/actions";
 import type { CutImages } from "@/lib/types";
 
@@ -37,6 +37,7 @@ export default function AppointmentRow({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [stylistId, setStylistId] = useState(a.stylistId ?? "");
+  const [zoom, setZoom] = useState<number | null>(null);
   const shots = ANGLES.filter((x) => a.images[x.key]);
   const digits = a.customerPhone.replace(/\D/g, "");
 
@@ -132,15 +133,81 @@ export default function AppointmentRow({
               {a.cutDescription && <p className="whitespace-pre-line text-sm text-neutral-600">{a.cutDescription}</p>}
             </div>
           )}
-          {shots.map((s) => (
-            <figure key={s.key} className="overflow-hidden rounded-xl border border-neutral-200">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={a.images[s.key]} alt={`${a.cutName || "Corte"} - ${s.label}`} className="aspect-square w-full object-cover" />
-              <figcaption className="py-1.5 text-center text-xs text-neutral-500">{s.label}</figcaption>
-            </figure>
-          ))}
+          {shots.length > 0 && (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {shots.map((s, i) => (
+                <button
+                  key={s.key}
+                  onClick={() => setZoom(i)}
+                  className="overflow-hidden rounded-xl border border-neutral-200 text-left transition hover:border-accent"
+                  title="Ver en grande"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={a.images[s.key]} alt={`${a.cutName || "Corte"} - ${s.label}`} className="aspect-square w-full object-cover" />
+                  <span className="block py-1 text-center text-xs text-neutral-500">{s.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
+      {zoom !== null && shots[zoom] && (
+        <Lightbox
+          src={a.images[shots[zoom].key]!}
+          label={`${a.cutName || "Corte"} · ${shots[zoom].label}`}
+          onClose={() => setZoom(null)}
+          onPrev={shots.length > 1 ? () => setZoom((zoom - 1 + shots.length) % shots.length) : undefined}
+          onNext={shots.length > 1 ? () => setZoom((zoom + 1) % shots.length) : undefined}
+        />
+      )}
     </li>
+  );
+}
+
+function Lightbox({
+  src,
+  label,
+  onClose,
+  onPrev,
+  onNext,
+}: {
+  src: string;
+  label: string;
+  onClose: () => void;
+  onPrev?: () => void;
+  onNext?: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowLeft") onPrev?.();
+      if (e.key === "ArrowRight") onNext?.();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose, onPrev, onNext]);
+
+  const nav = "absolute top-1/2 -translate-y-1/2 rounded-full bg-white/90 px-3 py-2 text-lg text-neutral-800 shadow hover:bg-white";
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={onClose}>
+      <figure className="relative w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt={label} className="max-h-[85vh] w-full rounded-2xl object-contain" />
+        <figcaption className="mt-2 text-center text-sm text-white/80">{label}</figcaption>
+        {onPrev && (
+          <button onClick={onPrev} className={`${nav} left-2`} aria-label="Anterior">
+            ‹
+          </button>
+        )}
+        {onNext && (
+          <button onClick={onNext} className={`${nav} right-2`} aria-label="Siguiente">
+            ›
+          </button>
+        )}
+        <button onClick={onClose} className="absolute right-2 top-2 rounded-full bg-white/90 px-2.5 py-1 text-neutral-800 shadow hover:bg-white" aria-label="Cerrar">
+          ✕
+        </button>
+      </figure>
+    </div>
   );
 }
