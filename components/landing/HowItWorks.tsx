@@ -62,7 +62,7 @@ export default function HowItWorks() {
           </div>
         </StepCard>
 
-        <StepCard n={3} title="Lo ves desde todos los ángulos" text="Frente, perfiles y nuca, con tips para mantenerlo, productos del local y cada cuánto retocarlo.">
+        <StepCard n={3} title="Lo ves desde todos los ángulos" text="Frente, perfiles y nuca, con tips para mantenerlo y cada cuánto retocarlo.">
           <Image src={perfil} alt="Vista de perfil del corte" fill sizes={sizes} placeholder="blur" className={photo} />
           <div className="absolute left-3 top-3 flex gap-1">
             {["Frente", "Perfil", "Nuca"].map((l) => (
@@ -73,11 +73,11 @@ export default function HowItWorks() {
           </div>
           <div className="absolute inset-x-3 bottom-3 rounded-xl bg-white/95 p-2.5 text-[11px] leading-snug text-ink shadow">
             <p className="font-semibold text-accent">Recomendaciones</p>
-            <p>Crema para rulos · retoque cada 5 semanas</p>
+            <p>Peinalo con los dedos · retoque cada 5 semanas</p>
           </div>
         </StepCard>
 
-        <StepCard n={4} title="Reservás tu turno" text="Elegís día y horario. Tu peluquero recibe la foto exacta del corte que elegiste.">
+        <StepCard n={4} title="Reservás tu turno" text="Elegís día y horario. Si te probaste un corte, el local recibe la foto exacta.">
           <div className="absolute inset-0 flex flex-col justify-center gap-3 bg-gradient-to-br from-accent-soft to-surface p-4">
             <div className="flex items-center gap-3 rounded-2xl bg-white p-2.5 shadow-sm">
               <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl">
@@ -85,7 +85,7 @@ export default function HowItWorks() {
               </div>
               <div className="min-w-0 text-xs">
                 <p className="truncate font-semibold text-ink">Pompadour con laterales cortos</p>
-                <p className="text-foreground/60">Corte · 30 min</p>
+                <p className="text-foreground/60">Corte agregado a tu turno</p>
               </div>
             </div>
             <div className="grid grid-cols-4 gap-1.5 text-center text-[11px] font-medium">

@@ -2,7 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { cancelAppointment, getCurrentAdmin } from "@/lib/data";
+import {
+  assignStylist,
+  completeAppointment,
+  createStylist,
+  deleteAppointment,
+  deleteStylist,
+  getCurrentAdmin,
+  updateStylist,
+} from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
 
 export type LoginState = { error: string | null };
@@ -23,16 +31,46 @@ export async function logoutAction() {
   redirect("/admin");
 }
 
-export type CancelResult = { ok: true; offeredTo: string | null } | { ok: false; error: string };
+export type ActionResult = { ok: true } | { ok: false; error: string };
 
-export async function cancelAppointmentAction(id: string): Promise<CancelResult> {
+/** Corre una mutación con el salón del admin logueado y revalida el panel. */
+async function withAdmin(run: (salonId: string) => Promise<void>, fallback: string): Promise<ActionResult> {
   const admin = await getCurrentAdmin();
   if (!admin) return { ok: false, error: "Tu sesión expiró. Volvé a ingresar." };
   try {
-    const { offeredTo } = await cancelAppointment(id);
+    await run(admin.salon.id);
     revalidatePath("/admin/panel");
-    return { ok: true, offeredTo: offeredTo?.customerName ?? null };
+    revalidatePath(`/peluqueria/${admin.salon.slug}`);
+    return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "No se pudo cancelar el turno." };
+    return { ok: false, error: e instanceof Error ? e.message : fallback };
   }
+}
+
+export async function assignStylistAction(id: string, stylistId: string | null): Promise<ActionResult> {
+  return withAdmin((salonId) => assignStylist(salonId, id, stylistId || null), "No se pudo asignar el peluquero.");
+}
+
+export async function completeAppointmentAction(id: string): Promise<ActionResult> {
+  return withAdmin((salonId) => completeAppointment(salonId, id), "No se pudo completar el turno.");
+}
+
+export async function cancelAppointmentAction(id: string): Promise<ActionResult> {
+  return withAdmin((salonId) => deleteAppointment(salonId, id), "No se pudo cancelar el turno.");
+}
+
+export async function createStylistAction(name: string, specialties: string): Promise<ActionResult> {
+  if (!name.trim()) return { ok: false, error: "Poné un nombre." };
+  return withAdmin(async (salonId) => {
+    await createStylist(salonId, name.slice(0, 80), specialties.slice(0, 300));
+  }, "No se pudo agregar el peluquero.");
+}
+
+export async function updateStylistAction(id: string, name: string, specialties: string): Promise<ActionResult> {
+  if (!name.trim()) return { ok: false, error: "Poné un nombre." };
+  return withAdmin((salonId) => updateStylist(salonId, id, name.slice(0, 80), specialties.slice(0, 300)), "No se pudo guardar.");
+}
+
+export async function deleteStylistAction(id: string): Promise<ActionResult> {
+  return withAdmin((salonId) => deleteStylist(salonId, id), "No se pudo borrar el peluquero.");
 }

@@ -1,7 +1,10 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getCurrentAdmin, getSalonCatalog, listAppointments, listWaitlist } from "@/lib/data";
+import { getCurrentAdmin, getSalonCatalog, listAppointments } from "@/lib/data";
+import type { Appointment } from "@/lib/types";
 import { logoutAction } from "../actions";
-import AppointmentCard, { type AppointmentView } from "@/components/admin/AppointmentCard";
+import AppointmentRow, { type AppointmentRowData } from "@/components/admin/AppointmentRow";
+import StylistsManager from "@/components/admin/StylistsManager";
 import { Logo } from "@/components/landing/ui";
 
 export const dynamic = "force-dynamic";
@@ -10,164 +13,158 @@ export const metadata = { title: "Agenda · Panel de peluquerías" };
 
 const TZ = "America/Argentina/Buenos_Aires";
 const dayKey = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(new Date(iso));
-const money = (n: number) =>
-  new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(n);
+const timeLabel = (iso: string) => new Date(iso).toLocaleTimeString("es-AR", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
+
+type Tab = "turnos" | "historial" | "peluqueros";
+const TABS: { key: Tab; label: string }[] = [
+  { key: "turnos", label: "Turnos" },
+  { key: "historial", label: "Historial" },
+  { key: "peluqueros", label: "Peluqueros" },
+];
 
 // Página dinámica: se renderiza por request, la hora actual es estable dentro del render.
 function requestTime() {
   return Date.now();
 }
 
-function dayLabel(key: string, todayKey: string, tomorrowKey: string) {
-  const label = new Intl.DateTimeFormat("es-AR", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }).format(
-    new Date(`${key}T12:00:00Z`),
-  );
-  if (key === todayKey) return `Hoy · ${label}`;
-  if (key === tomorrowKey) return `Mañana · ${label}`;
-  return label.charAt(0).toUpperCase() + label.slice(1);
+function dayLabel(key: string, now: number) {
+  const today = dayKey(new Date(now).toISOString());
+  if (key === today) return "Hoy";
+  if (key === dayKey(new Date(now + 86400000).toISOString())) return "Mañana";
+  if (key === dayKey(new Date(now - 86400000).toISOString())) return "Ayer";
+  return new Intl.DateTimeFormat("es-AR", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })
+    .format(new Date(`${key}T12:00:00Z`))
+    .replace(/[.,]/g, "");
 }
 
-export default async function AdminPanelPage() {
+function groupByDay(items: AppointmentRowData[]) {
+  const groups = new Map<string, AppointmentRowData[]>();
+  for (const a of items) {
+    const key = dayKey(a.start);
+    groups.set(key, [...(groups.get(key) ?? []), a]);
+  }
+  return [...groups.entries()];
+}
+
+export default async function AdminPanelPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const admin = await getCurrentAdmin();
   if (!admin) redirect("/admin");
   const { salon } = admin;
+  const { tab: rawTab } = await searchParams;
+  const tab: Tab = TABS.some((t) => t.key === rawTab) ? (rawTab as Tab) : "turnos";
 
-  const [appointments, waitlist, catalog] = await Promise.all([
-    listAppointments(salon.id),
-    listWaitlist(salon.id),
-    getSalonCatalog(salon.id),
-  ]);
-
-  const services = new Map(catalog.services.map((s) => [s.id, s]));
-  const stylists = new Map(catalog.stylists.map((s) => [s.id, s]));
-  const products = new Map(catalog.products.map((p) => [p.id, p]));
+  const [appointments, catalog] = await Promise.all([listAppointments(salon.id), getSalonCatalog(salon.id)]);
+  const services = new Map(catalog.services.map((s) => [s.id, s.name]));
+  const stylists = new Map(catalog.stylists.map((s) => [s.id, s.name]));
 
   const now = requestTime();
   const todayKey = dayKey(new Date(now).toISOString());
-  const tomorrowKey = dayKey(new Date(now + 86400000).toISOString());
-  const confirmed = appointments.filter((a) => a.status === "confirmado");
+  const toRow = (a: Appointment): AppointmentRowData => ({
+    id: a.id,
+    start: a.start,
+    time: timeLabel(a.start),
+    customerName: a.customerName,
+    customerPhone: a.customerPhone,
+    serviceName: a.serviceId ? (services.get(a.serviceId) ?? "") : "",
+    stylistId: a.stylistId,
+    stylistName: a.stylistId ? (stylists.get(a.stylistId) ?? "") : "",
+    cutName: a.cutName,
+    cutDescription: a.cutDescription,
+    images: a.images,
+  });
 
-  const metrics = [
-    { label: "Turnos de hoy", value: String(confirmed.filter((a) => dayKey(a.start) === todayKey).length) },
-    {
-      label: "Reservados con IA (7 días)",
-      value: String(
-        confirmed.filter((a) => a.cutName && now - new Date(a.createdAt).getTime() <= 7 * 86400000).length,
-      ),
-    },
-    {
-      label: "Facturación estimada",
-      value: money(confirmed.reduce((sum, a) => sum + (services.get(a.serviceId)?.price ?? 0), 0)),
-    },
-    { label: "Productos recomendados", value: String(confirmed.reduce((n, a) => n + a.recommendedProductIds.length, 0)) },
-  ];
-
-  // Agenda: desde hoy en adelante, agrupada por día.
-  const upcoming = appointments.filter((a) => dayKey(a.start) >= todayKey);
-  const groups = new Map<string, AppointmentView[]>();
-  for (const a of upcoming) {
-    const key = dayKey(a.start);
-    const view: AppointmentView = {
-      ...a,
-      serviceName: services.get(a.serviceId)?.name ?? "Servicio",
-      servicePrice: services.get(a.serviceId)?.price ?? 0,
-      stylistName: stylists.get(a.stylistId)?.name ?? "Estilista",
-      productNames: a.recommendedProductIds.map((id) => products.get(id)?.name).filter((n): n is string => Boolean(n)),
-    };
-    groups.set(key, [...(groups.get(key) ?? []), view]);
-  }
+  const pending = appointments.filter((a) => a.status === "pendiente").map(toRow);
+  const done = appointments
+    .filter((a) => a.status === "completado")
+    .sort((a, b) => b.start.localeCompare(a.start))
+    .map(toRow);
+  const todayCount = pending.filter((a) => dayKey(a.start) === todayKey).length;
+  const stylistOptions = catalog.stylists.map((s) => ({ id: s.id, name: s.name }));
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
-      <Logo className="mb-6" />
-      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-neutral-200 pb-6">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-widest text-accent">Panel de la peluquería</p>
-          <h1 className="mt-1 text-2xl font-bold sm:text-3xl">{salon.name}</h1>
-          <p className="text-sm text-neutral-500">
-            {salon.address} · {salon.city}
-          </p>
-        </div>
+    <main className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
+      <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <a
-            href={`/peluqueria/${salon.slug}`}
-            className="rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm transition hover:bg-neutral-100"
-          >
-            Ver página pública
+          <Logo />
+          <span className="h-5 w-px bg-neutral-200" />
+          <div>
+            <h1 className="text-base font-semibold leading-tight">{salon.name}</h1>
+            <p className="text-xs text-neutral-500">
+              {todayCount} {todayCount === 1 ? "turno" : "turnos"} hoy · {pending.length} {pending.length === 1 ? "pendiente" : "pendientes"}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1 text-sm">
+          <a href={`/peluqueria/${salon.slug}`} className="rounded-lg px-3 py-1.5 text-neutral-600 hover:bg-neutral-100">
+            Página pública
           </a>
-          <span className="hidden text-sm text-neutral-500 sm:inline">{admin.email}</span>
           <form action={logoutAction}>
-            <button className="rounded-lg bg-neutral-100 px-3 py-2 text-sm font-medium transition hover:bg-neutral-200">
-              Cerrar sesión
-            </button>
+            <button className="rounded-lg px-3 py-1.5 text-neutral-600 hover:bg-neutral-100">Salir</button>
           </form>
         </div>
       </header>
 
-      <section className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {metrics.map((m) => (
-          <div key={m.label} className="rounded-2xl border border-neutral-200 bg-white shadow-sm p-4">
-            <p className="text-xs text-neutral-500">{m.label}</p>
-            <p className="mt-1 text-2xl font-bold text-accent">{m.value}</p>
-          </div>
-        ))}
-      </section>
+      <nav className="mt-6 flex gap-1 border-b border-neutral-200">
+        {TABS.map((t) => {
+          const count = t.key === "turnos" ? pending.length : t.key === "historial" ? done.length : catalog.stylists.length;
+          return (
+            <Link
+              key={t.key}
+              href={`/admin/panel?tab=${t.key}`}
+              className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition ${
+                tab === t.key ? "border-accent text-accent" : "border-transparent text-neutral-500 hover:text-neutral-900"
+              }`}
+            >
+              {t.label} <span className="text-xs font-normal text-neutral-400">{count}</span>
+            </Link>
+          );
+        })}
+      </nav>
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_300px]">
-        <section>
-          <h2 className="text-lg font-semibold">Agenda</h2>
-          {groups.size === 0 && (
-            <p className="mt-4 rounded-xl border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-500">
-              Todavía no hay turnos próximos.
-            </p>
-          )}
-          <div className="mt-4 space-y-8">
-            {[...groups.entries()].map(([key, items]) => (
-              <div key={key}>
-                <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-neutral-500">
-                  {dayLabel(key, todayKey, tomorrowKey)}{" "}
-                  <span className="font-normal normal-case text-neutral-500">
-                    · {items.filter((i) => i.status === "confirmado").length} turnos
-                  </span>
-                </h3>
-                <div className="space-y-3">
-                  {items.map((a) => (
-                    <AppointmentCard key={a.id} appointment={a} />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
+      {tab === "turnos" && (
+        <section className="mt-6 space-y-6">
+          {pending.length === 0 && <Empty text="No hay turnos pendientes." />}
+          {groupByDay(pending).map(([key, items]) => (
+            <div key={key}>
+              <h2 className={`mb-2 text-xs font-semibold uppercase tracking-wide ${key < todayKey ? "text-amber-600" : "text-neutral-500"}`}>
+                {dayLabel(key, now)}
+                {key < todayKey && " · sin completar"}
+              </h2>
+              <ul className="divide-y divide-neutral-100 overflow-hidden rounded-2xl border border-neutral-200 bg-white">
+                {items.map((a) => (
+                  <AppointmentRow key={a.id} appointment={a} stylists={stylistOptions} />
+                ))}
+              </ul>
+            </div>
+          ))}
         </section>
+      )}
 
-        <aside>
-          <h2 className="text-lg font-semibold">Lista de espera</h2>
-          <p className="mt-1 text-xs text-neutral-500">Cuando cancelás un turno, se le ofrece al primero de la lista.</p>
-          <ul className="mt-4 space-y-2">
-            {waitlist.length === 0 && <li className="text-sm text-neutral-500">Nadie en espera.</li>}
-            {waitlist.map((w) => (
-              <li key={w.id} className="rounded-xl border border-neutral-200 bg-white shadow-sm p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-medium">{w.customerName}</p>
-                  <span
-                    className={
-                      w.status === "esperando"
-                        ? "rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800"
-                        : "rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800"
-                    }
-                  >
-                    {w.status === "esperando" ? "Esperando" : "Turno ofrecido"}
-                  </span>
-                </div>
-                <p className="mt-1 text-xs text-neutral-500">
-                  {w.customerPhone}
-                  {w.serviceId && services.get(w.serviceId) ? ` · ${services.get(w.serviceId)!.name}` : ""}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </aside>
-      </div>
+      {tab === "historial" && (
+        <section className="mt-6 space-y-6">
+          {done.length === 0 && <Empty text="Todavía no hay turnos completados." />}
+          {groupByDay(done).map(([key, items]) => (
+            <div key={key}>
+              <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">{dayLabel(key, now)}</h2>
+              <ul className="divide-y divide-neutral-100 overflow-hidden rounded-2xl border border-neutral-200 bg-white">
+                {items.map((a) => (
+                  <AppointmentRow key={a.id} appointment={a} stylists={stylistOptions} readOnly />
+                ))}
+              </ul>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {tab === "peluqueros" && (
+        <section className="mt-6">
+          <StylistsManager stylists={catalog.stylists.map((s) => ({ id: s.id, name: s.name, specialties: s.specialties }))} />
+        </section>
+      )}
     </main>
   );
+}
+
+function Empty({ text }: { text: string }) {
+  return <p className="rounded-2xl border border-dashed border-neutral-300 p-8 text-center text-sm text-neutral-500">{text}</p>;
 }

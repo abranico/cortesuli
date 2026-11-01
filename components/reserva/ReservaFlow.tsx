@@ -3,11 +3,20 @@
 import Link from "next/link";
 import { useState } from "react";
 import type { CutSuggestion, CutView, FaceAnalysis } from "@/lib/ai";
-import type { Appointment, Salon, SalonCatalog, Slot } from "@/lib/types";
+import type { Appointment, CutImages, Salon, SalonCatalog, Slot } from "@/lib/types";
 import GuidedCapture, { type CapturedPhotos } from "./GuidedCapture";
 
-type Step = "intro" | "captura" | "analizando" | "elegir" | "detalle" | "reserva" | "listo";
+type Step = "inicio" | "captura" | "analizando" | "elegir" | "detalle" | "reserva" | "listo";
 type ImgState = string | "loading" | "error";
+
+/** Corte probado con IA que el cliente agregó a su turno. */
+type AttachedCut = {
+  name: string;
+  description: string;
+  images: CutImages;
+  retouchWeeks: number;
+  notes: string;
+};
 
 const TZ = "America/Argentina/Buenos_Aires";
 const money = (n: number) => new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(n);
@@ -25,6 +34,13 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
   return data as T;
 }
 
+async function fetchSlots(slug: string, days?: number): Promise<Slot[]> {
+  const qs = new URLSearchParams({ slug, ...(days ? { days: String(days) } : {}) });
+  const res = await fetch(`/api/turnos?${qs}`, { cache: "no-store" });
+  const data = (await res.json()) as { slots?: Slot[] };
+  return (data.slots ?? []).filter((s) => s.available);
+}
+
 function CutImage({ state, alt }: { state: ImgState | undefined; alt: string }) {
   if (!state || state === "loading")
     return (
@@ -39,7 +55,7 @@ function CutImage({ state, alt }: { state: ImgState | undefined; alt: string }) 
 }
 
 export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog: SalonCatalog }) {
-  const [step, setStep] = useState<Step>("intro");
+  const [step, setStep] = useState<Step>("inicio");
   const [photos, setPhotos] = useState<CapturedPhotos | null>(null);
   const [analysis, setAnalysis] = useState<FaceAnalysis | null>(null);
   const [previews, setPreviews] = useState<ImgState[]>([]);
@@ -49,8 +65,8 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
   const [wish, setWish] = useState("");
   const [error, setError] = useState<string | null>(null);
 
+  const [attached, setAttached] = useState<AttachedCut | null>(null);
   const [serviceId, setServiceId] = useState("");
-  const [stylistId, setStylistId] = useState("");
   const [slots, setSlots] = useState<Slot[] | null>(null);
   const [day, setDay] = useState<string | null>(null);
   const [slot, setSlot] = useState<Slot | null>(null);
@@ -59,11 +75,8 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
   const [booking, setBooking] = useState(false);
   const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [retouch, setRetouch] = useState<Appointment | "loading" | "none" | null>(null);
-  const [waitlisted, setWaitlisted] = useState(false);
 
   const cut: CutSuggestion | undefined = analysis?.cuts[selected];
-  const stylistName = (id: string) => catalog.stylists.find((s) => s.id === id)?.name ?? "";
-  const service = catalog.services.find((s) => s.id === serviceId);
   const availableViews: CutView[] = photos?.left ? ["front", "left", "right", "back"] : ["front", "back"];
 
   const analyze = async (p: CapturedPhotos, w?: string) => {
@@ -82,7 +95,7 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
-      setStep("intro");
+      setStep("inicio");
     }
   };
 
@@ -113,97 +126,104 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
     );
   };
 
-  const loadSlots = async (svc: string, sty: string) => {
+  const loadSlots = async () => {
     setSlots(null);
     setSlot(null);
-    const qs = new URLSearchParams({ slug: salon.slug, serviceId: svc, ...(sty ? { stylistId: sty } : {}) });
-    const { slots: list } = (await (await fetch(`/api/turnos?${qs}`)).json()) as { slots: Slot[] };
-    setSlots(list);
-    setDay(list[0] ? dayKey(list[0].start) : null);
+    try {
+      const list = await fetchSlots(salon.slug);
+      setSlots(list);
+      setDay((prev) => (prev && list.some((s) => dayKey(s.start) === prev) ? prev : list[0] ? dayKey(list[0].start) : null));
+    } catch {
+      setSlots([]);
+      setError("No pudimos cargar los horarios. Probá de nuevo.");
+    }
   };
 
   const goReserva = () => {
-    if (!cut) return;
-    setServiceId(cut.serviceId);
-    setStylistId(cut.stylistId);
+    setError(null);
     setStep("reserva");
-    loadSlots(cut.serviceId, cut.stylistId);
+    if (!slots) loadSlots();
   };
 
-  const images = () => {
-    const front = previews[selected];
-    const valid = (s: ImgState | undefined) => (s && s !== "loading" && s !== "error" ? s : undefined);
-    return { front: valid(front), left: valid(angles.left), right: valid(angles.right), back: valid(angles.back) };
+  const valid = (s: ImgState | undefined) => (s && s !== "loading" && s !== "error" ? s : undefined);
+
+  const attachCut = () => {
+    if (!cut || !analysis) return;
+    const images: CutImages = {};
+    const front = valid(previews[selected]);
+    if (front) images.front = front;
+    for (const v of ["left", "right", "back"] as const) {
+      const img = valid(angles[v]);
+      if (img) images[v] = img;
+    }
+    setAttached({
+      name: cut.name,
+      description: cut.description,
+      images,
+      retouchWeeks: cut.retouchWeeks,
+      notes: `Cara ${analysis.faceShape}. Pelo: ${analysis.hairType}.`,
+    });
+    if (catalog.services.some((s) => s.id === cut.serviceId)) setServiceId(cut.serviceId);
+    goReserva();
   };
 
-  const book = async (s: Slot) => {
-    if (!cut || !analysis) return null;
-    return (
+  const tryCut = () => {
+    setError(null);
+    setStep(analysis ? "elegir" : "captura");
+  };
+
+  const book = async (start: string) =>
+    (
       await postJson<{ appointment: Appointment }>("/api/turnos", {
         slug: salon.slug,
-        stylistId: s.stylistId,
-        serviceId,
+        serviceId: serviceId || null,
         customerName: name,
         customerPhone: phone,
-        start: s.start,
-        cutName: cut.name,
-        cutDescription: cut.description,
-        images: images(),
-        recommendedProductIds: cut.productIds,
-        notes: `Cara ${analysis.faceShape}. Pelo: ${analysis.hairType}.`,
+        start,
+        cutName: attached?.name ?? "",
+        cutDescription: attached?.description ?? "",
+        images: attached?.images ?? {},
+        notes: attached?.notes ?? "",
       })
     ).appointment;
-  };
 
   const confirm = async () => {
     if (!slot) return;
     setBooking(true);
     setError(null);
     try {
-      setAppointment(await book(slot));
+      setAppointment(await book(slot.start));
       setStep("listo");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
-      loadSlots(serviceId, stylistId);
+      setError(e instanceof Error ? e.message : "No pudimos reservar. Probá de nuevo.");
+      loadSlots();
     } finally {
       setBooking(false);
     }
   };
 
-  const joinWaitlist = async () => {
-    setError(null);
-    try {
-      await postJson("/api/turnos", { slug: salon.slug, waitlist: true, serviceId, customerName: name, customerPhone: phone });
-      setWaitlisted(true);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
-    }
-  };
-
   const bookRetouch = async () => {
-    if (!appointment || !cut) return;
+    if (!appointment || !attached) return;
     setRetouch("loading");
-    const target = new Date(appointment.start).getTime() + cut.retouchWeeks * 7 * 86400000;
-    const qs = new URLSearchParams({ slug: salon.slug, serviceId, stylistId: appointment.stylistId, days: String(cut.retouchWeeks * 7 + 10) });
-    const { slots: list } = (await (await fetch(`/api/turnos?${qs}`)).json()) as { slots: Slot[] };
-    const later = list.filter((s) => new Date(s.start).getTime() >= target - 86400000);
-    const sameTime = later.find((s) => timeLabel(s.start) === timeLabel(appointment.start));
-    const pick = sameTime ?? later[0];
-    if (!pick) return setRetouch("none");
     try {
-      setRetouch(await book(pick));
+      const weeks = Math.min(Math.max(attached.retouchWeeks, 1), 10);
+      const target = new Date(appointment.start).getTime() + weeks * 7 * 86400000;
+      const list = await fetchSlots(salon.slug, weeks * 7 + 10);
+      const later = list.filter((s) => new Date(s.start).getTime() >= target);
+      const sameTime = later.find(
+        (s) => timeLabel(s.start) === timeLabel(appointment.start) && new Date(s.start).getTime() < target + 7 * 86400000,
+      );
+      const pick = sameTime ?? later[0];
+      if (!pick) return setRetouch("none");
+      setRetouch(await book(pick.start));
     } catch {
       setRetouch("none");
     }
   };
 
-  const daySlots = (() => {
-    if (!slots || !day) return [];
-    const seen = new Map<string, Slot>();
-    for (const s of slots.filter((s) => dayKey(s.start) === day)) if (!seen.has(s.start)) seen.set(s.start, s);
-    return [...seen.values()];
-  })();
+  const daySlots = slots && day ? slots.filter((s) => dayKey(s.start) === day) : [];
   const days = slots ? [...new Set(slots.map((s) => dayKey(s.start)))].slice(0, 8) : [];
+  const service = catalog.services.find((s) => s.id === serviceId);
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6">
@@ -211,26 +231,51 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
         <Link href={`/peluqueria/${salon.slug}`} className="text-sm text-neutral-500 hover:text-neutral-900">
           ← {salon.name}
         </Link>
-        <span className="text-xs uppercase tracking-widest text-accent">Probador IA</span>
+        <span className="text-xs uppercase tracking-widest text-accent">Reservá tu turno</span>
       </header>
 
       {error && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
-      {step === "intro" && (
-        <section className="flex flex-col gap-6 pt-6 text-center">
-          <h1 className="font-display text-3xl font-bold sm:text-4xl">Probate tu próximo corte antes de sentarte en el sillón</h1>
-          <p className="text-neutral-500">
-            Te sacamos 3 fotos girando la cabeza, la IA analiza tu cara y te muestra 3 cortes que te quedan bien. Elegís uno, lo ves desde todos
-            los ángulos y reservás tu turno en el momento.
-          </p>
-          <button onClick={() => setStep("captura")} className="rounded-full bg-accent px-6 py-4 text-lg font-semibold text-white hover:bg-accent-strong">
-            Abrir cámara
+      {step === "inicio" && (
+        <section className="flex flex-col gap-6 pt-4">
+          <div className="text-center">
+            <h1 className="font-display text-3xl font-bold sm:text-4xl">¿Qué querés hacer?</h1>
+            <p className="mt-2 text-neutral-500">Reservá directo, o si tenés ganas probate antes un corte con IA. Es opcional.</p>
+          </div>
+          <button
+            onClick={goReserva}
+            className="flex flex-col gap-1 rounded-3xl bg-accent px-6 py-6 text-left text-white shadow-sm shadow-accent/30 transition hover:bg-accent-strong"
+          >
+            <span className="text-2xl font-semibold">Reservar turno</span>
+            <span className="text-sm text-white/85">Elegís día y horario, y listo. Te lleva un minuto.</span>
           </button>
-          <p className="text-xs text-neutral-500">Tus fotos solo se usan para generar las propuestas y para que tu peluquero vea el corte elegido.</p>
+          <button
+            onClick={() => setStep("captura")}
+            className="flex flex-col gap-1 rounded-3xl border border-neutral-200 bg-surface px-6 py-6 text-left transition hover:border-accent"
+          >
+            <span className="flex items-center gap-2 text-xl font-semibold">
+              Probarme un corte con IA
+              <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent-strong">Opcional</span>
+            </span>
+            <span className="text-sm text-neutral-500">
+              Te sacamos 3 fotos girando la cabeza y la IA te muestra 3 cortes que te quedan bien, desde todos los ángulos. Si te gusta uno, lo
+              sumás a tu turno.
+            </span>
+          </button>
+          <p className="text-center text-xs text-neutral-500">
+            Si usás la IA, tus fotos solo se usan para generar las propuestas y para que el local vea el corte que elegiste.
+          </p>
         </section>
       )}
 
-      {step === "captura" && <GuidedCapture onDone={onCaptured} />}
+      {step === "captura" && (
+        <section className="flex flex-col gap-4">
+          <button onClick={() => setStep("inicio")} className="self-start text-sm text-neutral-500 hover:text-neutral-900">
+            ← Volver
+          </button>
+          <GuidedCapture onDone={onCaptured} />
+        </section>
+      )}
 
       {step === "analizando" && (
         <section className="flex flex-col items-center gap-6 py-16 text-center">
@@ -239,13 +284,13 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
             <img src={photos.front} alt="" className="h-40 w-40 animate-pulse rounded-full object-cover ring-4 ring-accent/60" />
           )}
           <h2 className="text-2xl font-semibold">Analizando tu cara...</h2>
-          <p className="text-neutral-500">Forma de cara, tipo de pelo y qué cortes del local te favorecen.</p>
+          <p className="text-neutral-500">Forma de cara, tipo de pelo y qué cortes te favorecen.</p>
         </section>
       )}
 
       {step === "elegir" && analysis && (
         <section className="flex flex-col gap-5">
-          <div className="rounded-2xl border border-neutral-200 bg-surface shadow-sm p-4">
+          <div className="rounded-2xl border border-neutral-200 bg-surface p-4 shadow-sm">
             <p className="text-xs uppercase tracking-widest text-accent">Tu diagnóstico</p>
             <p className="mt-1 text-sm text-neutral-600">
               Cara <b>{analysis.faceShape}</b> · {analysis.hairType}
@@ -288,6 +333,9 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
               </button>
             </div>
           </div>
+          <button onClick={goReserva} className="text-sm text-neutral-500 underline underline-offset-4 hover:text-neutral-900">
+            Seguir sin corte y reservar turno
+          </button>
         </section>
       )}
 
@@ -315,109 +363,64 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
             ))}
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-2xl border border-neutral-200 bg-surface shadow-sm p-4">
-              <p className="text-xs uppercase tracking-widest text-accent">Por qué te queda bien</p>
-              <p className="mt-2 text-neutral-800">{cut.why}</p>
-              <p className="mt-3 text-xs uppercase tracking-widest text-accent">Cómo mantenerlo</p>
-              <ul className="mt-2 flex list-disc flex-col gap-1 pl-5 text-sm text-neutral-600">
-                {cut.careTips.map((t) => (
-                  <li key={t}>{t}</li>
-                ))}
-              </ul>
-              <p className="mt-3 text-sm text-neutral-600">
-                Conviene retocarlo cada <b>{cut.retouchWeeks} semanas</b>.
-              </p>
-            </div>
-            <div className="flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-surface shadow-sm p-4">
-              <p className="text-xs uppercase tracking-widest text-accent">Lo tenemos en el local</p>
-              {cut.productIds.length === 0 && <p className="text-sm text-neutral-500">Este corte no necesita productos especiales.</p>}
-              {cut.productIds.map((id) => {
-                const p = catalog.products.find((x) => x.id === id);
-                return (
-                  p && (
-                    <div key={id} className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-medium">{p.name}</p>
-                        <p className="text-xs text-neutral-500">{p.description}</p>
-                      </div>
-                      <span className="whitespace-nowrap text-sm text-accent">{money(p.price)}</span>
-                    </div>
-                  )
-                );
-              })}
-              <p className="mt-auto text-sm text-neutral-600">
-                Te recomendamos a <b>{stylistName(cut.stylistId)}</b> para este corte.
-              </p>
-            </div>
+          <div className="rounded-2xl border border-neutral-200 bg-surface p-4 shadow-sm">
+            <p className="text-xs uppercase tracking-widest text-accent">Por qué te queda bien</p>
+            <p className="mt-2 text-neutral-800">{cut.why}</p>
+            <p className="mt-4 text-xs uppercase tracking-widest text-accent">Cómo mantenerlo</p>
+            <ul className="mt-2 flex list-disc flex-col gap-1 pl-5 text-sm text-neutral-600">
+              {cut.careTips.map((t) => (
+                <li key={t}>{t}</li>
+              ))}
+            </ul>
+            <p className="mt-3 text-sm text-neutral-600">
+              Conviene retocarlo cada <b>{cut.retouchWeeks} semanas</b>.
+            </p>
           </div>
 
-          <button onClick={goReserva} className="rounded-full bg-accent px-6 py-4 text-lg font-semibold text-white hover:bg-accent-strong">
-            Reservar este corte
+          <button onClick={attachCut} className="rounded-full bg-accent px-6 py-4 text-lg font-semibold text-white hover:bg-accent-strong">
+            Agregar este corte a mi turno
           </button>
         </section>
       )}
 
-      {step === "reserva" && cut && (
+      {step === "reserva" && (
         <section className="flex flex-col gap-5">
-          <button onClick={() => setStep("detalle")} className="self-start text-sm text-neutral-500 hover:text-neutral-900">
-            ← Volver al corte
+          <button
+            onClick={() => setStep(attached && cut ? "detalle" : "inicio")}
+            className="self-start text-sm text-neutral-500 hover:text-neutral-900"
+          >
+            ← Volver
           </button>
-          <div className="flex items-center gap-4">
-            <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl">
-              <CutImage state={previews[selected]} alt={cut.name} />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold">Reservá tu {cut.name.toLowerCase()}</h2>
-              {service && (
-                <p className="text-sm text-neutral-500">
-                  {service.name} · {service.durationMin} min · {money(service.price)}
-                </p>
-              )}
-            </div>
-          </div>
+          <h2 className="text-2xl font-bold">Elegí día y horario</h2>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="flex flex-col gap-1 text-sm text-neutral-600">
-              Servicio
-              <select
-                value={serviceId}
-                onChange={(e) => {
-                  setServiceId(e.target.value);
-                  loadSlots(e.target.value, stylistId);
-                }}
-                className="rounded-xl border border-neutral-300 bg-white px-3 py-2"
-              >
-                {catalog.services.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} ({s.durationMin} min)
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-sm text-neutral-600">
-              Peluquero
-              <select
-                value={stylistId}
-                onChange={(e) => {
-                  setStylistId(e.target.value);
-                  loadSlots(serviceId, e.target.value);
-                }}
-                className="rounded-xl border border-neutral-300 bg-white px-3 py-2"
-              >
-                <option value="">Cualquiera</option>
-                {catalog.stylists.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                    {s.id === cut.stylistId ? " (recomendado)" : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+          {attached ? (
+            <div className="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-surface p-3">
+              <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-surface-2">
+                {attached.images.front && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={attached.images.front} alt={attached.name} className="h-full w-full object-cover" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-neutral-500">Corte agregado a tu turno</p>
+                <p className="truncate font-semibold">{attached.name}</p>
+              </div>
+              <button onClick={() => setAttached(null)} className="rounded-lg px-3 py-1.5 text-sm text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900">
+                Quitar
+              </button>
+            </div>
+          ) : (
+            <button onClick={tryCut} className="self-start text-sm text-accent underline-offset-4 hover:underline">
+              ¿Querés probarte un corte con IA antes? (opcional)
+            </button>
+          )}
 
           {!slots ? (
             <p className="text-sm text-neutral-500">Buscando horarios...</p>
+          ) : slots.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-neutral-300 p-4 text-center text-sm text-neutral-500">
+              No hay horarios libres en los próximos días.
+            </p>
           ) : (
             <>
               <div className="flex gap-2 overflow-x-auto pb-1">
@@ -444,14 +447,31 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
                   <button
                     key={s.start}
                     onClick={() => setSlot(s)}
-                    className={`rounded-xl border py-2 text-sm ${slot?.start === s.start ? "border-accent bg-accent-soft text-accent-strong font-semibold" : "border-neutral-200 hover:border-neutral-400"}`}
+                    className={`rounded-xl border py-2 text-sm ${slot?.start === s.start ? "border-accent bg-accent-soft font-semibold text-accent-strong" : "border-neutral-200 hover:border-neutral-400"}`}
                   >
                     {timeLabel(s.start)}
                   </button>
                 ))}
-                {daySlots.length === 0 && <p className="col-span-full text-sm text-neutral-500">No hay horarios disponibles.</p>}
               </div>
             </>
+          )}
+
+          {catalog.services.length > 0 && (
+            <label className="flex flex-col gap-1 text-sm text-neutral-600">
+              Servicio (opcional)
+              <select
+                value={serviceId}
+                onChange={(e) => setServiceId(e.target.value)}
+                className="rounded-xl border border-neutral-300 bg-white px-3 py-2"
+              >
+                <option value="">Lo defino en el local</option>
+                {catalog.services.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} · {money(s.price)}
+                  </option>
+                ))}
+              </select>
+            </label>
           )}
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -475,58 +495,55 @@ export default function ReservaFlow({ salon, catalog }: { salon: Salon; catalog:
             disabled={!slot || !name.trim() || !phone.trim() || booking}
             className="rounded-full bg-accent px-6 py-4 text-lg font-semibold text-white hover:bg-accent-strong disabled:opacity-40"
           >
-            {booking ? "Reservando..." : slot ? `Confirmar ${dayLabel(slot.start)} ${timeLabel(slot.start)} con ${stylistName(slot.stylistId)}` : "Elegí un horario"}
+            {booking ? "Reservando..." : slot ? `Confirmar ${dayLabel(slot.start)} a las ${timeLabel(slot.start)}` : "Elegí un horario"}
           </button>
-
-          {waitlisted ? (
-            <p className="text-center text-sm text-emerald-700">Listo, quedaste en la lista de espera. Si se libera un turno te avisamos por WhatsApp.</p>
-          ) : (
-            <button
-              onClick={joinWaitlist}
-              disabled={!name.trim() || !phone.trim()}
-              className="text-sm text-neutral-500 underline underline-offset-4 hover:text-neutral-900 disabled:no-underline disabled:opacity-50"
-            >
-              ¿No te sirve ningún horario? Anotate en la lista de espera
-            </button>
-          )}
         </section>
       )}
 
-      {step === "listo" && appointment && cut && (
+      {step === "listo" && appointment && (
         <section className="flex flex-col items-center gap-5 text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-3xl text-emerald-700">✓</div>
-          <h2 className="text-3xl font-bold">¡Turno confirmado!</h2>
+          <h2 className="text-3xl font-bold">¡Turno reservado!</h2>
           <p className="text-neutral-600">
-            {name.split(" ")[0]}, te esperamos el <b>{fullLabel(appointment.start)}</b> con <b>{stylistName(appointment.stylistId)}</b> en {salon.address}.
-          </p>
-          <div className="w-full max-w-xs overflow-hidden rounded-3xl border border-neutral-200">
-            <div className="aspect-square">
-              <CutImage state={previews[selected]} alt={cut.name} />
-            </div>
-            <p className="p-3 text-sm text-neutral-600">
-              {stylistName(appointment.stylistId)} ya tiene la foto de tu <b>{cut.name}</b> desde todos los ángulos.
-            </p>
-          </div>
-
-          <div className="w-full rounded-2xl border border-accent/40 bg-accent-soft/50 p-4">
-            {retouch === null && (
+            {name.split(" ")[0]}, te esperamos el <b>{fullLabel(appointment.start)}</b> en {salon.address}.
+            {service && (
               <>
-                <p className="text-neutral-800">
-                  Este corte se retoca cada <b>{cut.retouchWeeks} semanas</b>. ¿Te dejamos reservado el retoque?
-                </p>
-                <button onClick={bookRetouch} className="mt-3 rounded-full bg-accent px-5 py-2 font-semibold text-white hover:bg-accent-strong">
-                  Sí, reservame el retoque
-                </button>
+                {" "}
+                Servicio: <b>{service.name}</b>.
               </>
             )}
-            {retouch === "loading" && <p className="text-neutral-600">Buscando el mejor horario...</p>}
-            {retouch === "none" && <p className="text-neutral-600">No encontramos un horario para el retoque todavía. Te escribimos cuando se acerque la fecha.</p>}
-            {retouch && typeof retouch === "object" && (
-              <p className="text-emerald-700">
-                Retoque reservado para el {fullLabel(retouch.start)} con {stylistName(retouch.stylistId)}.
-              </p>
-            )}
-          </div>
+          </p>
+          {attached && (
+            <>
+              <div className="w-full max-w-xs overflow-hidden rounded-3xl border border-neutral-200">
+                {attached.images.front && (
+                  <div className="aspect-square">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={attached.images.front} alt={attached.name} className="h-full w-full object-cover" />
+                  </div>
+                )}
+                <p className="p-3 text-sm text-neutral-600">
+                  El local ya tiene las fotos de tu <b>{attached.name}</b>.
+                </p>
+              </div>
+
+              <div className="w-full rounded-2xl border border-accent/40 bg-accent-soft/50 p-4">
+                {retouch === null && (
+                  <>
+                    <p className="text-neutral-800">
+                      Este corte se retoca cada <b>{attached.retouchWeeks} semanas</b>. ¿Te dejamos reservado el retoque?
+                    </p>
+                    <button onClick={bookRetouch} className="mt-3 rounded-full bg-accent px-5 py-2 font-semibold text-white hover:bg-accent-strong">
+                      Sí, reservame el retoque
+                    </button>
+                  </>
+                )}
+                {retouch === "loading" && <p className="text-neutral-600">Buscando el mejor horario...</p>}
+                {retouch === "none" && <p className="text-neutral-600">No encontramos un horario para el retoque todavía. Te escribimos cuando se acerque la fecha.</p>}
+                {retouch && typeof retouch === "object" && <p className="text-emerald-700">Retoque reservado para el {fullLabel(retouch.start)}.</p>}
+              </div>
+            </>
+          )}
           <Link href={`/peluqueria/${salon.slug}`} className="text-sm text-neutral-500 underline underline-offset-4">
             Volver a {salon.name}
           </Link>

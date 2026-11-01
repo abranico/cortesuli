@@ -39,23 +39,13 @@ export type Service = {
   salonId: string;
   name: string;
   category: ServiceCategory;
-  durationMin: number;
   price: number;
 };
 
-export type Product = {
-  id: string;
-  salonId: string;
-  name: string;
-  description: string;
-  price: number;
-  tags: string[];
-};
-
+/** Turno fijo de 30 minutos. `available` es false si ya se llenó la capacidad (cantidad de peluqueros). */
 export type Slot = {
-  stylistId: string;
   start: string;
-  end: string;
+  available: boolean;
 };
 
 export type CutImages = {
@@ -65,44 +55,30 @@ export type CutImages = {
   back?: string;
 };
 
-export type AppointmentStatus = "confirmado" | "cancelado";
+export type AppointmentStatus = "pendiente" | "completado";
 
 export type Appointment = {
   id: string;
   salonId: string;
-  stylistId: string;
-  serviceId: string;
+  stylistId: string | null;
+  serviceId: string | null;
   customerName: string;
   customerPhone: string;
   start: string;
-  end: string;
   status: AppointmentStatus;
   cutName: string;
   cutDescription: string;
   images: CutImages;
-  recommendedProductIds: string[];
   notes: string;
   createdAt: string;
 };
 
-export type NewAppointment = Omit<Appointment, "id" | "status" | "createdAt" | "end">;
-
-export type WaitlistStatus = "esperando" | "notificado";
-
-export type WaitlistEntry = {
-  id: string;
-  salonId: string;
-  customerName: string;
-  customerPhone: string;
-  serviceId: string | null;
-  status: WaitlistStatus;
-  createdAt: string;
-};
-
-export type NewWaitlistEntry = Pick<WaitlistEntry, "salonId" | "customerName" | "customerPhone" | "serviceId">;
+export type NewAppointment = Pick<
+  Appointment,
+  "salonId" | "serviceId" | "customerName" | "customerPhone" | "start" | "cutName" | "cutDescription" | "images" | "notes"
+>;
 
 export type SalonCatalog = {
   stylists: Stylist[];
   services: Service[];
-  products: Product[];
 };

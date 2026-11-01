@@ -4,8 +4,6 @@ import type {
   Appointment,
   CutImages,
   NewAppointment,
-  NewWaitlistEntry,
-  Product,
   Salon,
   SalonCatalog,
   SalonSearchQuery,
@@ -13,7 +11,6 @@ import type {
   Service,
   Slot,
   Stylist,
-  WaitlistEntry,
 } from "./types";
 
 // Capa de datos sobre Supabase. Funciones públicas usan el cliente anónimo; las de admin usan la sesión (RLS).
@@ -21,6 +18,8 @@ import type {
 const IMAGE_BUCKET = "cortes";
 // Argentina: UTC-3 fijo (sin horario de verano).
 const TZ_OFFSET_MIN = -180;
+/** Todos los turnos duran lo mismo: bloques fijos de 30 minutos. */
+export const SLOT_MIN = 30;
 
 /* ---------------------------------- mappers --------------------------------- */
 
@@ -63,19 +62,7 @@ function mapService(r: Row): Service {
     salonId: str(r.salon_id),
     name: str(r.name),
     category: r.category as Service["category"],
-    durationMin: Number(r.duration_min),
     price: Number(r.price),
-  };
-}
-
-function mapProduct(r: Row): Product {
-  return {
-    id: str(r.id),
-    salonId: str(r.salon_id),
-    name: str(r.name),
-    description: str(r.description),
-    price: Number(r.price),
-    tags: arr(r.tags),
   };
 }
 
@@ -83,30 +70,16 @@ function mapAppointment(r: Row): Appointment {
   return {
     id: str(r.id),
     salonId: str(r.salon_id),
-    stylistId: str(r.stylist_id),
-    serviceId: str(r.service_id),
+    stylistId: (r.stylist_id as string | null) ?? null,
+    serviceId: (r.service_id as string | null) ?? null,
     customerName: str(r.customer_name),
     customerPhone: str(r.customer_phone),
     start: new Date(str(r.start_at)).toISOString(),
-    end: new Date(str(r.end_at)).toISOString(),
     status: r.status as Appointment["status"],
     cutName: str(r.cut_name),
     cutDescription: str(r.cut_description),
     images: (r.images as CutImages | null) ?? {},
-    recommendedProductIds: arr(r.recommended_product_ids),
     notes: str(r.notes),
-    createdAt: new Date(str(r.created_at)).toISOString(),
-  };
-}
-
-function mapWaitlist(r: Row): WaitlistEntry {
-  return {
-    id: str(r.id),
-    salonId: str(r.salon_id),
-    customerName: str(r.customer_name),
-    customerPhone: str(r.customer_phone),
-    serviceId: (r.service_id as string | null) ?? null,
-    status: r.status as WaitlistEntry["status"],
     createdAt: new Date(str(r.created_at)).toISOString(),
   };
 }
@@ -170,35 +143,33 @@ export async function searchSalons(query: SalonSearchQuery): Promise<SalonSearch
 
 export async function getSalonCatalog(salonId: string): Promise<SalonCatalog> {
   const sb = createAnonClient();
-  const [st, sv, pr] = await Promise.all([
-    sb.from("stylists").select("*").eq("salon_id", salonId).order("sort"),
+  const [st, sv] = await Promise.all([
+    sb.from("stylists").select("*").eq("salon_id", salonId).order("sort").order("name"),
     sb.from("services").select("*").eq("salon_id", salonId).order("sort"),
-    sb.from("products").select("*").eq("salon_id", salonId).order("sort"),
   ]);
   if (st.error) fail("getSalonCatalog", st.error);
   if (sv.error) fail("getSalonCatalog", sv.error);
-  if (pr.error) fail("getSalonCatalog", pr.error);
   return {
     stylists: (st.data ?? []).map(mapStylist),
     services: (sv.data ?? []).map(mapService),
-    products: (pr.data ?? []).map(mapProduct),
   };
 }
 
-export async function getAvailableSlots(salonId: string, serviceId: string, stylistId?: string, days = 6): Promise<Slot[]> {
+/**
+ * Horarios libres de los próximos `days` días hábiles (+2 de margen). Cada horario admite tantos turnos
+ * como peluqueros tenga el local; los horarios llenos no se devuelven.
+ */
+export async function getAvailableSlots(salonId: string, days = 6): Promise<Slot[]> {
   const sb = createAnonClient();
-  const [salonRes, serviceRes, stylistsRes] = await Promise.all([
-    sb.from("salons").select("open_days, open_hour, close_hour, step_min").eq("id", salonId).maybeSingle(),
-    sb.from("services").select("duration_min").eq("id", serviceId).eq("salon_id", salonId).maybeSingle(),
-    sb.from("stylists").select("id").eq("salon_id", salonId).order("sort"),
+  const [salonRes, stylistsRes] = await Promise.all([
+    sb.from("salons").select("open_days, open_hour, close_hour").eq("id", salonId).maybeSingle(),
+    sb.from("stylists").select("id", { count: "exact", head: true }).eq("salon_id", salonId),
   ]);
-  if (!salonRes.data || !serviceRes.data) return [];
+  if (!salonRes.data) return [];
   const openDays = (salonRes.data.open_days as number[]) ?? [2, 3, 4, 5, 6];
   const openHour = Number(salonRes.data.open_hour);
   const closeHour = Number(salonRes.data.close_hour);
-  const step = Number(salonRes.data.step_min) || 30;
-  const duration = Number(serviceRes.data.duration_min);
-  const stylistIds = (stylistsRes.data ?? []).map((s) => String(s.id)).filter((id) => !stylistId || id === stylistId);
+  const capacity = Math.max(stylistsRes.count ?? 0, 1);
 
   const now = Date.now();
   const nowLocal = new Date(now + TZ_OFFSET_MIN * 60000);
@@ -207,26 +178,20 @@ export async function getAvailableSlots(salonId: string, serviceId: string, styl
   const from = new Date(baseDay - TZ_OFFSET_MIN * 60000).toISOString();
   const to = new Date(baseDay + totalDays * 86400000 - TZ_OFFSET_MIN * 60000).toISOString();
 
-  const { data: busyData, error } = await sb.rpc("get_busy_slots", { p_salon_id: salonId, p_from: from, p_to: to });
+  const { data: countData, error } = await sb.rpc("get_slot_counts", { p_salon_id: salonId, p_from: from, p_to: to });
   if (error) fail("getAvailableSlots", error);
-  const busy = ((busyData ?? []) as Row[]).map((b) => ({
-    stylistId: str(b.stylist_id),
-    start: new Date(str(b.start_at)).getTime(),
-    end: new Date(str(b.end_at)).getTime(),
-  }));
+  const booked = new Map<number, number>();
+  for (const r of (countData ?? []) as Row[]) booked.set(new Date(str(r.start_at)).getTime(), Number(r.booked));
 
   const slots: Slot[] = [];
   for (let d = 0; d < totalDays; d++) {
     const dayUtc = baseDay + d * 86400000;
     if (!openDays.includes(new Date(dayUtc).getUTCDay())) continue;
-    for (let m = openHour * 60; m + duration <= closeHour * 60; m += step) {
+    for (let m = openHour * 60; m + SLOT_MIN <= closeHour * 60; m += SLOT_MIN) {
       const start = dayUtc + (m - TZ_OFFSET_MIN) * 60000;
-      const end = start + duration * 60000;
       if (start < now) continue;
-      for (const id of stylistIds) {
-        const clash = busy.some((b) => b.stylistId === id && b.start < end && b.end > start);
-        if (!clash) slots.push({ stylistId: id, start: new Date(start).toISOString(), end: new Date(end).toISOString() });
-      }
+      if ((booked.get(start) ?? 0) >= capacity) continue;
+      slots.push({ start: new Date(start).toISOString(), available: true });
     }
   }
   return slots;
@@ -238,8 +203,9 @@ async function uploadImages(salonId: string, images: CutImages): Promise<CutImag
   const out: CutImages = {};
   await Promise.all(
     (Object.entries(images) as [keyof CutImages, string | undefined][]).map(async ([key, value]) => {
-      if (!value) return;
-      if (/^https?:\/\//i.test(value)) {
+      if (!value || !["front", "left", "right", "back"].includes(key)) return;
+      // URLs ya publicadas (absolutas o relativas al sitio) se guardan tal cual.
+      if (/^https?:\/\//i.test(value) || /^\/[^/]/.test(value)) {
         out[key] = value;
         return;
       }
@@ -262,47 +228,22 @@ export async function createAppointment(input: NewAppointment): Promise<Appointm
   const images = await uploadImages(input.salonId, input.images ?? {});
   const { data, error } = await createAnonClient().rpc("book_appointment", {
     p_salon_id: input.salonId,
-    p_stylist_id: input.stylistId,
-    p_service_id: input.serviceId,
+    p_service_id: input.serviceId ?? "",
     p_customer_name: input.customerName,
     p_customer_phone: input.customerPhone,
     p_start: new Date(input.start).toISOString(),
     p_cut_name: input.cutName ?? "",
     p_cut_description: input.cutDescription ?? "",
     p_images: images,
-    p_recommended_product_ids: input.recommendedProductIds ?? [],
     p_notes: input.notes ?? "",
   });
   if (error) {
-    // Errores de negocio ("Ese horario ya fue tomado", "Servicio inexistente") se propagan tal cual.
+    // Errores de negocio ("Ese horario se acaba de ocupar, elegí otro", etc.) se propagan tal cual.
     if (error.code === "P0001") throw new Error(error.message);
-    if (error.code === "23P01") throw new Error("Ese horario ya fue tomado");
     fail("createAppointment", error);
   }
   const row = (Array.isArray(data) ? data[0] : data) as Row;
   return mapAppointment(row);
-}
-
-export async function addToWaitlist(input: NewWaitlistEntry): Promise<WaitlistEntry> {
-  const entry: WaitlistEntry = {
-    ...input,
-    serviceId: input.serviceId ?? null,
-    id: crypto.randomUUID(),
-    status: "esperando",
-    createdAt: new Date().toISOString(),
-  };
-  // El cliente anónimo puede insertar pero no leer: no usamos .select().
-  const { error } = await createAnonClient().from("waitlist").insert({
-    id: entry.id,
-    salon_id: entry.salonId,
-    customer_name: entry.customerName,
-    customer_phone: entry.customerPhone,
-    service_id: entry.serviceId,
-    status: entry.status,
-    created_at: entry.createdAt,
-  });
-  if (error) fail("addToWaitlist", error);
-  return entry;
 }
 
 /* ---------------------------------- admin ----------------------------------- */
@@ -330,43 +271,91 @@ export async function listAppointments(salonId: string): Promise<Appointment[]> 
   return (data ?? []).map(mapAppointment);
 }
 
-export async function cancelAppointment(id: string): Promise<{ appointment: Appointment; offeredTo: WaitlistEntry | null }> {
+export async function assignStylist(salonId: string, id: string, stylistId: string | null): Promise<void> {
   const sb = await createClient();
-  const { data, error } = await sb.from("appointments").update({ status: "cancelado" }).eq("id", id).select("*").maybeSingle();
-  if (error) fail("cancelAppointment", error);
+  const { data, error } = await sb
+    .from("appointments")
+    .update({ stylist_id: stylistId })
+    .eq("id", id)
+    .eq("salon_id", salonId)
+    .select("id")
+    .maybeSingle();
+  if (error?.code === "23505") throw new Error("Ese peluquero ya tiene un turno a esa hora.");
+  if (error) fail("assignStylist", error);
   if (!data) throw new Error("Turno inexistente");
-  const appointment = mapAppointment(data);
-
-  const { data: waiting } = await sb
-    .from("waitlist")
-    .select("*")
-    .eq("salon_id", appointment.salonId)
-    .eq("status", "esperando")
-    .order("created_at");
-  const candidates = (waiting ?? []).map(mapWaitlist);
-  const pick =
-    candidates.find((w) => w.serviceId === appointment.serviceId) ??
-    candidates.find((w) => w.serviceId === null) ??
-    candidates[0] ??
-    null;
-
-  let offeredTo: WaitlistEntry | null = null;
-  if (pick) {
-    const { data: upd } = await sb
-      .from("waitlist")
-      .update({ status: "notificado" })
-      .eq("id", pick.id)
-      .eq("status", "esperando")
-      .select("*")
-      .maybeSingle();
-    if (upd) offeredTo = mapWaitlist(upd);
-  }
-  return { appointment, offeredTo };
 }
 
-export async function listWaitlist(salonId: string): Promise<WaitlistEntry[]> {
+export async function completeAppointment(salonId: string, id: string): Promise<void> {
   const sb = await createClient();
-  const { data, error } = await sb.from("waitlist").select("*").eq("salon_id", salonId).order("created_at");
-  if (error) fail("listWaitlist", error);
-  return (data ?? []).map(mapWaitlist);
+  const { data, error } = await sb
+    .from("appointments")
+    .update({ status: "completado" })
+    .eq("id", id)
+    .eq("salon_id", salonId)
+    .select("id")
+    .maybeSingle();
+  if (error) fail("completeAppointment", error);
+  if (!data) throw new Error("Turno inexistente");
+}
+
+/** Ruta dentro del bucket a partir de la URL pública, solo si pertenece a la carpeta del salón. */
+function storagePath(url: string, salonId: string): string | null {
+  const marker = `/storage/v1/object/public/${IMAGE_BUCKET}/`;
+  const i = url.indexOf(marker);
+  if (i < 0) return null;
+  const path = decodeURIComponent(url.slice(i + marker.length).split("?")[0]);
+  return path.startsWith(`${salonId}/`) && !path.includes("..") ? path : null;
+}
+
+/** Cancelar = borrar el turno y sus imágenes del bucket. */
+export async function deleteAppointment(salonId: string, id: string): Promise<void> {
+  const sb = await createClient();
+  const { data, error } = await sb.from("appointments").delete().eq("id", id).eq("salon_id", salonId).select("images").maybeSingle();
+  if (error) fail("deleteAppointment", error);
+  if (!data) throw new Error("Turno inexistente");
+  const paths = Object.values((data.images as CutImages | null) ?? {})
+    .map((u) => (u ? storagePath(u, salonId) : null))
+    .filter((p): p is string => !!p);
+  if (paths.length) {
+    const { error: rmError } = await sb.storage.from(IMAGE_BUCKET).remove(paths);
+    if (rmError) console.error("No se pudieron borrar las imágenes", rmError);
+  }
+}
+
+const parseSpecialties = (v: string) =>
+  v
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, 10);
+
+export async function createStylist(salonId: string, name: string, specialties: string): Promise<Stylist> {
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("stylists")
+    .insert({ salon_id: salonId, name: name.trim(), specialties: parseSpecialties(specialties), sort: 100 })
+    .select("*")
+    .single();
+  if (error) fail("createStylist", error);
+  return mapStylist(data);
+}
+
+export async function updateStylist(salonId: string, id: string, name: string, specialties: string): Promise<void> {
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("stylists")
+    .update({ name: name.trim(), specialties: parseSpecialties(specialties) })
+    .eq("id", id)
+    .eq("salon_id", salonId)
+    .select("id")
+    .maybeSingle();
+  if (error) fail("updateStylist", error);
+  if (!data) throw new Error("Peluquero inexistente");
+}
+
+export async function deleteStylist(salonId: string, id: string): Promise<void> {
+  const sb = await createClient();
+  const { data, error } = await sb.from("stylists").delete().eq("id", id).eq("salon_id", salonId).select("id").maybeSingle();
+  if (error) fail("deleteStylist", error);
+  if (!data) throw new Error("Peluquero inexistente");
 }

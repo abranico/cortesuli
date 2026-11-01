@@ -18,30 +18,30 @@ const PAINS = [
   },
   {
     title: "Huecos en la agenda",
-    text: "Alguien cancela a último momento y el sillón queda vacío, mientras otro cliente se cansó de esperar y se fue.",
+    text: "Nadie sabe bien cuántos turnos hay a la misma hora, y terminás con gente esperando o con el sillón vacío.",
   },
 ];
 
 const FEATURES = [
   {
-    title: "Probador de cortes con IA",
-    text: "El cliente se saca una selfie girando la cabeza y ve 3 cortes sugeridos sobre su propia cara, desde frente, perfil y nuca.",
+    title: "Probador de cortes con IA (opcional)",
+    text: "Si quiere, el cliente se saca una selfie girando la cabeza y ve 3 cortes sugeridos sobre su propia cara, desde frente, perfil y nuca.",
   },
   {
     title: "Agenda con la foto del corte",
-    text: "Cada turno llega con la imagen exacta de lo que el cliente quiere. Tu peluquero sabe qué hacer antes de que se siente.",
+    text: "Si el cliente se probó un corte, el turno llega con la imagen exacta de lo que quiere. Sabés qué hacer antes de que se siente.",
   },
   {
-    title: "Turno con la duración correcta",
-    text: "Un corte no dura lo mismo que un color. La reserva bloquea el tiempo real y la asigna a quien mejor hace ese corte.",
+    title: "Reserva simple: día y hora",
+    text: "El cliente elige fecha y horario, y listo. Cada horario acepta tantos turnos como peluqueros tengas, sin sobreturnos.",
   },
   {
-    title: "Lista de espera automática",
-    text: "Si alguien cancela, le ofrecemos el lugar al siguiente de la lista. El hueco se llena solo.",
+    title: "Vos asignás a tu equipo",
+    text: "Desde el panel repartís cada turno entre tus peluqueros, lo marcás como completado o lo cancelás en un clic.",
   },
   {
-    title: "Recomendaciones que venden",
-    text: "Tips de peinado, los productos que vendés en tu local y cuándo volver. Más ticket promedio, más visitas.",
+    title: "Clientes que vuelven",
+    text: "Con el corte probado, la IA le deja tips de peinado y cada cuánto retocarlo, y puede reservar el retoque al toque.",
   },
   {
     title: "Tu página propia, lista hoy",
@@ -52,14 +52,14 @@ const FEATURES = [
 const STATS = [
   { value: "1 de 4", label: "consultas por WhatsApp quedan sin respuesta a tiempo" },
   { value: "-60%", label: "de malentendidos cuando el peluquero ve la foto del corte" },
-  { value: "+15%", label: "de ocupación llenando cancelaciones desde la lista de espera" },
+  { value: "2 min", label: "para reservar: día, hora y listo" },
 ];
 
 const OWNER_STEPS = [
-  { title: "Cargás tu salón", text: "Servicios, precios, duraciones y tu equipo con sus especialidades." },
+  { title: "Cargás tu salón", text: "Servicios, precios y tu equipo." },
   { title: "Compartís tu link", text: "En la bio de Instagram, en WhatsApp o con un QR en el espejo." },
-  { title: "Tus clientes se prueban el corte", text: "Selfie guiada, 3 propuestas con IA y vista desde todos los ángulos." },
-  { title: "Vos atendés, no anotás", text: "La agenda se llena sola, con la foto de cada corte y la lista de espera." },
+  { title: "Tus clientes reservan", text: "Eligen día y hora. Si quieren, antes se prueban el corte con IA." },
+  { title: "Vos atendés, no anotás", text: "La agenda se llena sola, con la foto del corte cuando el cliente se lo probó." },
 ];
 
 export default function Home() {
@@ -93,8 +93,8 @@ export default function Home() {
               Que se prueben el corte <span className="italic text-accent">antes</span> de sentarse.
             </h1>
             <p className="mt-6 max-w-xl text-lg leading-relaxed text-foreground/70">
-              Cortesuli reemplaza el ida y vuelta por WhatsApp: tus clientes se ven con el corte puesto, lo eligen y reservan su turno en
-              minutos. Vos recibís cada turno con la foto exacta de lo que quieren.
+              Cortesuli reemplaza el ida y vuelta por WhatsApp: tus clientes eligen día y hora y reservan en minutos. Y si quieren, antes se
+              prueban el corte con IA y vos recibís el turno con la foto exacta de lo que quieren.
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
               <PrimaryButton href={ADMIN_HREF} className="w-full sm:w-auto">
@@ -138,7 +138,7 @@ export default function Home() {
           <SectionTitle
             eyebrow="Cómo funciona"
             title="De la selfie al turno, en cuatro pasos"
-            subtitle="Tu cliente ve el corte en su cara antes de sentarse en el sillón. Lo que elige es lo que tu peluquero ve."
+            subtitle="Reservar es elegir día y hora. Probarse el corte con IA es opcional: el que quiere, lo ve en su cara antes de sentarse en el sillón."
           />
           <div className="mt-10">
             <HowItWorks />
@@ -212,7 +212,7 @@ export default function Home() {
           <div className="rounded-3xl border border-accent/30 bg-gradient-to-br from-accent-soft via-surface to-surface p-8 sm:p-12">
             <Eyebrow>¿Tenés una peluquería?</Eyebrow>
             <h2 className="mt-3 max-w-2xl font-display text-3xl font-semibold leading-tight sm:text-4xl">
-              Entrá al panel y gestioná tus turnos, tu agenda y tu lista de espera en un solo lugar.
+              Entrá al panel y gestioná tus turnos, tu historial y tu equipo en un solo lugar.
             </h2>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <PrimaryButton href={ADMIN_HREF} className="w-full sm:w-auto">

@@ -14,9 +14,7 @@ export type CutSuggestion = {
   why: string;
   imagePrompt: string;
   serviceId: string;
-  stylistId: string;
   careTips: string[];
-  productIds: string[];
   retouchWeeks: number;
 };
 
@@ -44,16 +42,14 @@ const analysisSchema = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["name", "description", "why", "imagePrompt", "serviceId", "stylistId", "careTips", "productIds", "retouchWeeks"],
+        required: ["name", "description", "why", "imagePrompt", "serviceId", "careTips", "retouchWeeks"],
         properties: {
           name: { type: "string", description: "Nombre corto del corte en español" },
           description: { type: "string", description: "Descripción técnica para el peluquero: largos por zona, degradé, textura, raya, barba" },
           why: { type: "string", description: "Por qué le queda bien a esta persona, en una o dos frases, tuteando con voseo" },
           imagePrompt: { type: "string", description: "Instrucción en inglés, precisa, describiendo SOLO el nuevo corte de pelo (y barba si corresponde) para un editor de imágenes" },
           serviceId: { type: "string", description: "id del servicio del catálogo que corresponde" },
-          stylistId: { type: "string", description: "id del peluquero cuya especialidad encaja mejor" },
           careTips: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 4, description: "Consejos de peinado y mantenimiento en casa" },
-          productIds: { type: "array", items: { type: "string" }, maxItems: 2, description: "ids de productos del catálogo recomendados" },
           retouchWeeks: { type: "integer", description: "Cada cuántas semanas conviene retocarlo" },
         },
       },
@@ -63,9 +59,7 @@ const analysisSchema = {
 
 export async function analyzeFace(front: string, catalog: SalonCatalog, wish?: string): Promise<FaceAnalysis> {
   const catalogText = JSON.stringify({
-    servicios: catalog.services.map(({ id, name, category, durationMin }) => ({ id, name, category, durationMin })),
-    peluqueros: catalog.stylists.map(({ id, name, specialties }) => ({ id, name, specialties })),
-    productos: catalog.products.map(({ id, name, description, tags }) => ({ id, name, description, tags })),
+    servicios: catalog.services.map(({ id, name, category }) => ({ id, name, category })),
   });
   const res = await openai().chat.completions.create({
     model: TEXT_MODEL,
@@ -74,7 +68,7 @@ export async function analyzeFace(front: string, catalog: SalonCatalog, wish?: s
       {
         role: "system",
         content:
-          "Sos un estilista senior de una peluquería/barbería argentina. Analizás la foto del cliente (forma de cara, tipo de pelo, barba) y proponés 3 cortes distintos entre sí que le favorezcan y que el local pueda hacer. Usá solo ids del catálogo dado. Hablale al cliente con voseo rioplatense. Catálogo del local: " +
+          "Sos un estilista senior de una peluquería/barbería argentina. Analizás la foto del cliente (forma de cara, tipo de pelo, barba) y proponés 3 cortes distintos entre sí que le favorezcan y que el local pueda hacer. Para serviceId usá solo ids de los servicios del catálogo dado. Hablale al cliente con voseo rioplatense. Catálogo del local: " +
           catalogText,
       },
       {
@@ -90,12 +84,8 @@ export async function analyzeFace(front: string, catalog: SalonCatalog, wish?: s
   if (!content) throw new Error("La IA no devolvió un análisis");
   const analysis = JSON.parse(content) as FaceAnalysis;
   const serviceIds = new Set(catalog.services.map((s) => s.id));
-  const stylistIds = new Set(catalog.stylists.map((s) => s.id));
-  const productIds = new Set(catalog.products.map((p) => p.id));
   for (const cut of analysis.cuts) {
     if (!serviceIds.has(cut.serviceId)) cut.serviceId = catalog.services[0]?.id ?? "";
-    if (!stylistIds.has(cut.stylistId)) cut.stylistId = catalog.stylists[0]?.id ?? "";
-    cut.productIds = cut.productIds.filter((id) => productIds.has(id));
   }
   return analysis;
 }

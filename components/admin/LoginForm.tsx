@@ -34,7 +34,7 @@ export default function LoginForm() {
         {pending ? "Ingresando…" : "Ingresar con cuenta demo"}
       </button>
       <p className="mt-2 text-center text-xs text-neutral-500">
-        Entrá al panel para gestionar turnos, agenda y lista de espera de Navaja &amp; Tijera.
+        Entrá al panel para gestionar los turnos y el equipo de Navaja &amp; Tijera.
       </p>
 
       <div className="my-6 flex items-center gap-3 text-xs text-neutral-500">

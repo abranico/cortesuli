@@ -10,7 +10,6 @@ import {
   SectionTitle,
   Steps,
   formatARS,
-  formatDuration,
   initials,
 } from "@/components/landing/ui";
 
@@ -22,26 +21,26 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!salon) return { title: "Peluquería no encontrada" };
   return {
     title: `${salon.name} — Reservá tu turno`,
-    description: `${salon.tagline}. Probate tu corte con IA y reservá online en ${salon.name}, ${salon.city}.`,
+    description: `${salon.tagline}. Reservá tu turno online en ${salon.name}, ${salon.city}. Si querés, probate antes el corte con IA.`,
   };
 }
 
 const STEPS = [
   {
-    title: "Grabate girando la cabeza",
-    text: "Una selfie guiada de pocos segundos, como cuando desbloqueás el celu con la cara. Te vamos indicando hacia dónde mirar.",
+    title: "Elegí día y hora",
+    text: "Reservar es así de simple: elegís el día, el horario que te queda cómodo, y dejás tu nombre y WhatsApp.",
   },
   {
-    title: "La IA te propone 3 cortes en tu cara",
-    text: "Según tu tipo de rostro y de pelo, ves tres opciones aplicadas sobre vos. Nada de fotos de modelos.",
+    title: "Si querés, probate el corte con IA",
+    text: "Es opcional. Una selfie guiada de pocos segundos y la IA te muestra tres cortes aplicados sobre vos.",
   },
   {
     title: "Miralo desde todos los ángulos",
-    text: "Frente, perfil y nuca. Además, tips de peinado, productos que te sirven y cada cuánto conviene volver.",
+    text: "Frente, perfil y nuca, con tips de peinado y cada cuánto conviene volver.",
   },
   {
-    title: "Reservá tu turno",
-    text: "Elegís horario y te asignamos a quien mejor hace ese corte. Tu peluquero ve la foto exacta de lo que querés.",
+    title: "Sumalo a tu turno",
+    text: "Agregás el corte que te gustó a tu reserva y en el local ven la foto exacta de lo que querés.",
   },
 ];
 
@@ -72,7 +71,7 @@ export default async function SalonPage({ params }: Props) {
             <p className="mt-5 max-w-xl text-lg leading-relaxed text-foreground/70 sm:text-xl">{salon.tagline}</p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
               <PrimaryButton href={bookHref} className="w-full sm:w-auto">
-                Probate tu corte con IA y reservá
+                Reservá tu turno
               </PrimaryButton>
               <a
                 href="#servicios"
@@ -107,8 +106,8 @@ export default async function SalonPage({ params }: Props) {
         <div className="mx-auto max-w-6xl px-5 py-16 sm:px-8 lg:py-20">
           <SectionTitle
             eyebrow="Cómo funciona"
-            title="Ves el corte en tu cara antes de sentarte en el sillón"
-            subtitle="Se terminó el “yo te pedí otra cosa”. Lo que elegís es lo que tu peluquero ve."
+            title="Reservás en un minuto. Y si querés, te probás el corte antes"
+            subtitle="Probarte el corte con IA es opcional. Si lo hacés, se terminó el “yo te pedí otra cosa”: lo que elegís es lo que ven en el local."
           />
           <div className="mt-10">
             <Steps steps={STEPS} />
@@ -119,14 +118,14 @@ export default async function SalonPage({ params }: Props) {
       {/* Servicios */}
       <section id="servicios" className="scroll-mt-6 border-t border-foreground/10">
         <div className="mx-auto max-w-6xl px-5 py-16 sm:px-8 lg:py-20">
-          <SectionTitle eyebrow="Servicios" title="Precios claros, duración real" />
+          <SectionTitle eyebrow="Servicios" title="Precios claros" />
           <ul className="mt-10 divide-y divide-foreground/10 overflow-hidden rounded-2xl border border-foreground/10 bg-surface">
             {services.map((s) => (
               <li key={s.id} className="flex items-center justify-between gap-4 px-5 py-5 sm:px-6">
                 <div>
                   <p className="text-base font-semibold sm:text-lg">{s.name}</p>
                   <p className="mt-1 text-sm text-foreground/55">
-                    <span className="capitalize">{s.category}</span> · {formatDuration(s.durationMin)}
+                    <span className="capitalize">{s.category}</span>
                   </p>
                 </div>
                 <p className="font-display text-xl font-semibold text-accent sm:text-2xl">{formatARS(s.price)}</p>
@@ -141,8 +140,8 @@ export default async function SalonPage({ params }: Props) {
         <div className="mx-auto max-w-6xl px-5 py-16 sm:px-8 lg:py-20">
           <SectionTitle
             eyebrow="El equipo"
-            title="Te asignamos a quien mejor hace tu corte"
-            subtitle="Cada peluquero tiene su especialidad. La IA cruza el corte que elegiste con quien lo domina."
+            title="Nuestro equipo"
+            subtitle="Las personas que te van a atender en el local."
           />
           <ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {stylists.map((st) => (
@@ -221,10 +220,11 @@ export default async function SalonPage({ params }: Props) {
           <div className="relative overflow-hidden rounded-3xl border border-accent/30 bg-gradient-to-br from-accent-soft via-surface to-surface p-8 sm:p-12">
             <Eyebrow>Tu próximo corte</Eyebrow>
             <h2 className="mt-3 max-w-xl font-display text-3xl font-semibold leading-tight sm:text-4xl">
-              Probátelo primero. Reservá después.
+              Reservá tu turno en un minuto.
             </h2>
+            <p className="mt-3 max-w-xl text-foreground/65">Si querés, antes te probás el corte con IA. Es opcional.</p>
             <PrimaryButton href={bookHref} className="mt-8 w-full sm:w-auto">
-              Probate tu corte con IA y reservá
+              Reservá tu turno
             </PrimaryButton>
           </div>
         </div>

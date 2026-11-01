@@ -5,13 +5,6 @@ export function formatARS(value: number): string {
   return `$${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 }).format(value)}`;
 }
 
-export function formatDuration(min: number): string {
-  if (min < 60) return `${min} min`;
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return m ? `${h} h ${m} min` : `${h} h`;
-}
-
 export function initials(name: string): string {
   return name
     .split(/\s+/)
