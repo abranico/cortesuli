@@ -77,7 +77,8 @@ export default function ReservaFlow({ salon, catalog, initialSlots }: { salon: S
   const [retouch, setRetouch] = useState<Appointment | "loading" | "none" | null>(null);
 
   const cut: CutSuggestion | undefined = analysis?.cuts[selected];
-  const availableViews: CutView[] = photos?.left ? ["front", "left", "right"] : ["front"];
+  const availableViews: CutView[] = ["front", "left", "right"];
+  const anglesLoading = previews[selected] === "loading" || Object.values(angles).some((s) => s === "loading");
 
   const analyze = async (p: CapturedPhotos, w?: string) => {
     setStep("analizando");
@@ -110,19 +111,16 @@ export default function ReservaFlow({ salon, catalog, initialSlots }: { salon: S
     setSelected(i);
     setView("front");
     setStep("detalle");
-    const extra: CutView[] = photos.left ? ["left", "right"] : [];
-    setAngles(Object.fromEntries(extra.map((v) => [v, "loading"])));
-    const refs: Record<CutView, string[]> = {
-      front: [photos.front],
-      left: [photos.left ?? photos.front],
-      right: [photos.right ?? photos.front],
-    };
-    extra.forEach((v) =>
-      postJson<{ image: string }>("/api/ia/corte", { photos: refs[v], prompt: c.imagePrompt, view: v })
-        .then((r) => r.image)
+    const sides = { left: photos.left, right: photos.right } as const;
+    setAngles({ left: "loading", right: "loading" });
+    (["left", "right"] as const).forEach((v) => {
+      const body = { photos: [sides[v] ?? photos.front], prompt: c.imagePrompt, view: v, fromFront: !sides[v] };
+      const render = () => postJson<{ image: string }>("/api/ia/corte", body).then((r) => r.image);
+      render()
+        .catch(render)
         .catch(() => "error" as const)
-        .then((img) => setAngles((prev) => ({ ...prev, [v]: img }))),
-    );
+        .then((img) => setAngles((prev) => ({ ...prev, [v]: img })));
+    });
   };
 
   const loadSlots = async () => {
@@ -322,7 +320,7 @@ export default function ReservaFlow({ salon, catalog, initialSlots }: { salon: S
           <div className="aspect-square w-full overflow-hidden rounded-3xl border border-neutral-200">
             <CutImage state={view === "front" ? previews[selected] : angles[view]} alt={`${cut.name} - ${VIEW_LABEL[view]}`} />
           </div>
-          <div className={`grid grid-cols-3 gap-2 ${availableViews.length < 2 ? "hidden" : ""}`}>
+          <div className="grid grid-cols-3 gap-2">
             {availableViews.map((v) => (
               <button
                 key={v}
@@ -351,8 +349,12 @@ export default function ReservaFlow({ salon, catalog, initialSlots }: { salon: S
             </p>
           </div>
 
-          <button onClick={attachCut} className="rounded-full bg-accent px-6 py-4 text-lg font-semibold text-white hover:bg-accent-strong">
-            Agregar este corte a mi turno
+          <button
+            onClick={attachCut}
+            disabled={anglesLoading}
+            className="rounded-full bg-accent px-6 py-4 text-lg font-semibold text-white hover:bg-accent-strong disabled:cursor-wait disabled:opacity-60"
+          >
+            {anglesLoading ? "Generando los perfiles..." : "Agregar este corte a mi turno"}
           </button>
         </section>
       )}
@@ -449,10 +451,14 @@ export default function ReservaFlow({ salon, catalog, initialSlots }: { salon: S
                     </button>
                   </div>
                 </div>
-                {attached.images.front && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={attached.images.front} alt={attached.name} className="aspect-square w-full max-w-xs rounded-xl object-cover" />
-                )}
+                <div className="grid grid-cols-3 gap-2">
+                  {availableViews
+                    .filter((v) => attached.images[v])
+                    .map((v) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img key={v} src={attached.images[v]} alt={`${attached.name} - ${VIEW_LABEL[v]}`} className="aspect-square w-full rounded-xl object-cover" />
+                    ))}
+                </div>
               </div>
             ) : (
               <button
@@ -511,15 +517,20 @@ export default function ReservaFlow({ salon, catalog, initialSlots }: { salon: S
           </p>
           {attached && (
             <>
-              <div className="w-full max-w-xs overflow-hidden rounded-3xl border border-neutral-200">
-                {attached.images.front && (
-                  <div className="aspect-square">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={attached.images.front} alt={attached.name} className="h-full w-full object-cover" />
-                  </div>
-                )}
-                <p className="p-3 text-sm text-neutral-600">
-                  El local ya tiene las fotos de tu <b>{attached.name}</b>.
+              <div className="w-full overflow-hidden rounded-3xl border border-neutral-200 bg-surface p-3">
+                <div className="grid grid-cols-3 gap-2">
+                  {availableViews
+                    .filter((v) => attached.images[v])
+                    .map((v) => (
+                      <figure key={v} className="overflow-hidden rounded-xl border border-neutral-200">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={attached.images[v]} alt={`${attached.name} - ${VIEW_LABEL[v]}`} className="aspect-square w-full object-cover" />
+                        <figcaption className="py-1 text-xs text-neutral-500">{VIEW_LABEL[v]}</figcaption>
+                      </figure>
+                    ))}
+                </div>
+                <p className="pt-3 text-sm text-neutral-600">
+                  Así te va a quedar tu <b>{attached.name}</b>. El local ya tiene estas fotos.
                 </p>
               </div>
 
