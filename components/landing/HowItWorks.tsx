@@ -107,7 +107,7 @@ export default function HowItWorks() {
             <p className="text-xs font-semibold uppercase tracking-[0.25em] text-accent">Antes → propuestas de la IA</p>
             <h3 className="mt-2 font-display text-2xl font-semibold sm:text-3xl">Una foto, tres cortes para elegir</h3>
           </div>
-          <p className="text-xs text-foreground/50">Imágenes ilustrativas. En la app las propuestas se generan sobre tu propia foto.</p>
+          <p className="text-xs text-foreground/50">Propuestas generadas por la IA de Cortesuli a partir de una sola foto.</p>
         </div>
         <div className="mt-6 grid items-center gap-4 lg:grid-cols-[1fr_auto_3fr]">
           <figure className="relative mx-auto aspect-square w-full max-w-xs overflow-hidden rounded-2xl lg:max-w-none">
