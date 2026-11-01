@@ -96,18 +96,25 @@ const VIEW_INSTRUCTIONS: Record<CutView, string> = {
   right: "Keep the exact same photo, framing, head pose (profile view), face, clothing and background.",
 };
 
+/** Cuando solo hay foto de frente, el perfil se genera a partir de ella. */
+const SIDE_FROM_FRONT: Record<Exclude<CutView, "front">, string> = {
+  left: "Using the reference photo of this same person, create a realistic photo of their LEFT side profile (head turned 90 degrees so the left side of the head and the side of the haircut are clearly visible). Keep the same face identity, skin, clothing, lighting and a similar background.",
+  right: "Using the reference photo of this same person, create a realistic photo of their RIGHT side profile (head turned 90 degrees so the right side of the head and the side of the haircut are clearly visible). Keep the same face identity, skin, clothing, lighting and a similar background.",
+};
+
 async function dataUrlToFile(dataUrl: string, name: string) {
   const [meta, b64] = dataUrl.split(",");
   const type = meta.match(/data:(.*?);/)?.[1] ?? "image/jpeg";
   return toFile(Buffer.from(b64, "base64"), `${name}.${type.split("/")[1] ?? "jpg"}`, { type });
 }
 
-export async function renderCut(images: string[], cutPrompt: string, view: CutView): Promise<string> {
+export async function renderCut(images: string[], cutPrompt: string, view: CutView, fromFront = false): Promise<string> {
   const files = await Promise.all(images.map((img, i) => dataUrlToFile(img, `ref-${i}`)));
+  const instructions = fromFront && view !== "front" ? SIDE_FROM_FRONT[view] : VIEW_INSTRUCTIONS[view];
   const res = await openai().images.edit({
     model: IMAGE_MODEL,
     image: files.length === 1 ? files[0] : files,
-    prompt: `Photorealistic hairstyle try-on for a barbershop. Change ONLY the hair (and facial hair if mentioned) of the person to: ${cutPrompt}. ${VIEW_INSTRUCTIONS[view]} The result must look like a real photo, natural hairline, realistic texture.`,
+    prompt: `Photorealistic hairstyle try-on for a barbershop. Change ONLY the hair (and facial hair if mentioned) of the person to: ${cutPrompt}. ${instructions} The result must look like a real photo, natural hairline, realistic texture.`,
     size: "1024x1024",
     quality: IMAGE_QUALITY,
     output_format: "jpeg",
