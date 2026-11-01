@@ -145,14 +145,14 @@ export default async function AdminPanelPage({ searchParams }: { searchParams: P
         </div>
       </header>
 
-      <nav className="-mx-4 mt-6 flex gap-1 overflow-x-auto border-b border-neutral-200 px-4 sm:mx-0 sm:px-0 print:hidden">
+      <nav className="-mx-4 mt-6 flex gap-1 overflow-x-auto overflow-y-hidden px-4 shadow-[inset_0_-1px_0_#e5e5e5] [scrollbar-width:none] sm:mx-0 sm:px-0 print:hidden [&::-webkit-scrollbar]:hidden">
         {TABS.map((t) => {
           const count = t.key === "turnos" ? pending.length : t.key === "historial" ? done.length : t.key === "peluqueros" ? catalog.stylists.length : null;
           return (
             <Link
               key={t.key}
               href={`/admin/panel?tab=${t.key}${filter && FILTERABLE.includes(t.key) ? `&peluquero=${filter}` : ""}`}
-              className={`-mb-px shrink-0 border-b-2 px-3 py-2 text-sm font-medium transition ${
+              className={`shrink-0 border-b-2 px-3 py-2 text-sm font-medium transition outline-none focus-visible:rounded-t-md focus-visible:bg-neutral-100 ${
                 tab === t.key ? "border-accent text-accent" : "border-transparent text-neutral-500 hover:text-neutral-900"
               }`}
             >
