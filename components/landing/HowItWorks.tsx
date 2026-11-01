@@ -62,10 +62,10 @@ export default function HowItWorks() {
           </div>
         </StepCard>
 
-        <StepCard n={3} title="Lo ves desde todos los ángulos" text="Frente, perfiles y nuca, con tips para mantenerlo y cada cuánto retocarlo.">
+        <StepCard n={3} title="Lo ves desde todos los ángulos" text="De frente y de perfil, con tips para mantenerlo y cada cuánto retocarlo.">
           <Image src={perfil} alt="Vista de perfil del corte" fill sizes={sizes} placeholder="blur" className={photo} />
           <div className="absolute left-3 top-3 flex gap-1">
-            {["Frente", "Perfil", "Nuca"].map((l) => (
+            {["Frente", "Perfil"].map((l) => (
               <span key={l} className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${l === "Perfil" ? "bg-accent text-white" : "bg-white/85 text-ink"}`}>
                 {l}
               </span>

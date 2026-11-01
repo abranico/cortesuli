@@ -22,7 +22,6 @@ const ANGLES: { key: keyof CutImages; label: string }[] = [
   { key: "front", label: "Frente" },
   { key: "left", label: "Perfil izq." },
   { key: "right", label: "Perfil der." },
-  { key: "back", label: "Nuca" },
 ];
 
 export default function AppointmentRow({
@@ -38,6 +37,7 @@ export default function AppointmentRow({
   const [error, setError] = useState<string | null>(null);
   const [stylistId, setStylistId] = useState(a.stylistId ?? "");
   const [zoom, setZoom] = useState<number | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const shots = ANGLES.filter((x) => a.images[x.key]);
   const digits = a.customerPhone.replace(/\D/g, "");
 
@@ -61,12 +61,12 @@ export default function AppointmentRow({
   };
 
   const onCancel = () => {
-    if (!window.confirm(`¿Cancelar el turno de ${a.customerName} a las ${a.time}? Se borra el turno y sus fotos.`)) return;
+    setConfirming(false);
     run(() => cancelAppointmentAction(a.id));
   };
 
   return (
-    <li className={`px-4 py-3 ${pending ? "opacity-60" : ""}`}>
+    <li className={`rounded-2xl border border-neutral-200 bg-white px-4 py-4 shadow-sm ${pending ? "opacity-60" : ""}`}>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <span className="w-12 shrink-0 font-mono text-sm font-semibold tabular-nums">{a.time}</span>
 
@@ -115,7 +115,7 @@ export default function AppointmentRow({
               Completar
             </button>
             <button
-              onClick={onCancel}
+              onClick={() => setConfirming(true)}
               disabled={pending}
               className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-neutral-500 hover:bg-red-50 hover:text-red-700"
             >
@@ -134,7 +134,7 @@ export default function AppointmentRow({
             </div>
           )}
           {shots.length > 0 && (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="grid max-w-xl grid-cols-3 gap-2">
               {shots.map((s, i) => (
                 <button
                   key={s.key}
@@ -160,7 +160,61 @@ export default function AppointmentRow({
           onNext={shots.length > 1 ? () => setZoom((zoom + 1) % shots.length) : undefined}
         />
       )}
+      {confirming && (
+        <ConfirmDialog
+          title="¿Cancelar este turno?"
+          text={`Se borra el turno de ${a.customerName} (${a.time}) y las fotos del corte. No se puede deshacer.`}
+          confirmLabel="Sí, cancelar turno"
+          onConfirm={onCancel}
+          onClose={() => setConfirming(false)}
+        />
+      )}
     </li>
+  );
+}
+
+function ConfirmDialog({
+  title,
+  text,
+  confirmLabel,
+  onConfirm,
+  onClose,
+}: {
+  title: string;
+  text: string;
+  confirmLabel: string;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="confirm-title"
+        className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 id="confirm-title" className="text-lg font-semibold">
+          {title}
+        </h3>
+        <p className="mt-2 text-sm text-neutral-600">{text}</p>
+        <div className="mt-5 flex justify-end gap-2">
+          <button onClick={onClose} autoFocus className="rounded-lg px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-100">
+            Volver
+          </button>
+          <button onClick={onConfirm} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700">
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

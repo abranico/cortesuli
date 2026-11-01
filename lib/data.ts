@@ -203,7 +203,7 @@ async function uploadImages(salonId: string, images: CutImages): Promise<CutImag
   const out: CutImages = {};
   await Promise.all(
     (Object.entries(images) as [keyof CutImages, string | undefined][]).map(async ([key, value]) => {
-      if (!value || !["front", "left", "right", "back"].includes(key)) return;
+      if (!value || !["front", "left", "right"].includes(key)) return;
       // URLs ya publicadas (absolutas o relativas al sitio) se guardan tal cual.
       if (/^https?:\/\//i.test(value) || /^\/[^/]/.test(value)) {
         out[key] = value;

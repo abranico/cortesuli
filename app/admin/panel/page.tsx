@@ -46,11 +46,13 @@ function groupByDay(items: AppointmentRowData[]) {
   return [...groups.entries()];
 }
 
-export default async function AdminPanelPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+const UNASSIGNED = "sin-asignar";
+
+export default async function AdminPanelPage({ searchParams }: { searchParams: Promise<{ tab?: string; peluquero?: string }> }) {
   const admin = await getCurrentAdmin();
   if (!admin) redirect("/admin");
   const { salon } = admin;
-  const { tab: rawTab } = await searchParams;
+  const { tab: rawTab, peluquero } = await searchParams;
   const tab: Tab = TABS.some((t) => t.key === rawTab) ? (rawTab as Tab) : "turnos";
 
   const [appointments, catalog] = await Promise.all([listAppointments(salon.id), getSalonCatalog(salon.id)]);
@@ -81,6 +83,13 @@ export default async function AdminPanelPage({ searchParams }: { searchParams: P
   const todayCount = pending.filter((a) => dayKey(a.start) === todayKey).length;
   const stylistOptions = catalog.stylists.map((s) => ({ id: s.id, name: s.name }));
 
+  const filter = peluquero && (peluquero === UNASSIGNED || stylists.has(peluquero)) ? peluquero : "";
+  const matches = (a: AppointmentRowData) => !filter || (filter === UNASSIGNED ? !a.stylistId : a.stylistId === filter);
+  const filterHref = (value: string) => `/admin/panel?tab=${tab}${value ? `&peluquero=${value}` : ""}`;
+  const filterOptions = [{ id: "", name: "Todos" }, ...stylistOptions, { id: UNASSIGNED, name: "Sin asignar" }];
+  const visiblePending = pending.filter(matches);
+  const visibleDone = done.filter(matches);
+
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -110,7 +119,7 @@ export default async function AdminPanelPage({ searchParams }: { searchParams: P
           return (
             <Link
               key={t.key}
-              href={`/admin/panel?tab=${t.key}`}
+              href={`/admin/panel?tab=${t.key}${filter && t.key !== "peluqueros" ? `&peluquero=${filter}` : ""}`}
               className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition ${
                 tab === t.key ? "border-accent text-accent" : "border-transparent text-neutral-500 hover:text-neutral-900"
               }`}
@@ -121,16 +130,33 @@ export default async function AdminPanelPage({ searchParams }: { searchParams: P
         })}
       </nav>
 
+      {tab !== "peluqueros" && catalog.stylists.length > 0 && (
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span className="text-xs text-neutral-500">Peluquero:</span>
+          {filterOptions.map((o) => (
+            <Link
+              key={o.id || "todos"}
+              href={filterHref(o.id)}
+              className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+                filter === o.id ? "border-accent bg-accent text-white" : "border-neutral-200 bg-white text-neutral-600 hover:border-neutral-400"
+              }`}
+            >
+              {o.name}
+            </Link>
+          ))}
+        </div>
+      )}
+
       {tab === "turnos" && (
-        <section className="mt-6 space-y-6">
-          {pending.length === 0 && <Empty text="No hay turnos pendientes." />}
-          {groupByDay(pending).map(([key, items]) => (
+        <section className="mt-6 space-y-8">
+          {visiblePending.length === 0 && <Empty text={filter ? "No hay turnos pendientes para este filtro." : "No hay turnos pendientes."} />}
+          {groupByDay(visiblePending).map(([key, items]) => (
             <div key={key}>
-              <h2 className={`mb-2 text-xs font-semibold uppercase tracking-wide ${key < todayKey ? "text-amber-600" : "text-neutral-500"}`}>
+              <h2 className={`mb-3 text-xs font-semibold uppercase tracking-wide ${key < todayKey ? "text-amber-600" : "text-neutral-500"}`}>
                 {dayLabel(key, now)}
                 {key < todayKey && " · sin completar"}
               </h2>
-              <ul className="divide-y divide-neutral-100 overflow-hidden rounded-2xl border border-neutral-200 bg-white">
+              <ul className="space-y-3">
                 {items.map((a) => (
                   <AppointmentRow key={a.id} appointment={a} stylists={stylistOptions} />
                 ))}
@@ -141,12 +167,12 @@ export default async function AdminPanelPage({ searchParams }: { searchParams: P
       )}
 
       {tab === "historial" && (
-        <section className="mt-6 space-y-6">
-          {done.length === 0 && <Empty text="Todavía no hay turnos completados." />}
-          {groupByDay(done).map(([key, items]) => (
+        <section className="mt-6 space-y-8">
+          {visibleDone.length === 0 && <Empty text={filter ? "No hay turnos completados para este filtro." : "Todavía no hay turnos completados."} />}
+          {groupByDay(visibleDone).map(([key, items]) => (
             <div key={key}>
-              <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">{dayLabel(key, now)}</h2>
-              <ul className="divide-y divide-neutral-100 overflow-hidden rounded-2xl border border-neutral-200 bg-white">
+              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">{dayLabel(key, now)}</h2>
+              <ul className="space-y-3">
                 {items.map((a) => (
                   <AppointmentRow key={a.id} appointment={a} stylists={stylistOptions} readOnly />
                 ))}
