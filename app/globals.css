@@ -10,7 +10,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-  --font-display: var(--font-display-serif);
+  --font-display: var(--font-display-sans);
 }
 
 /* Tema claro con acento verde para toda la app: bg-accent, text-accent, border-accent, etc.

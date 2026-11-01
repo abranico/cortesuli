@@ -89,8 +89,8 @@ export default function Home() {
         <div className="relative mx-auto grid max-w-6xl gap-12 px-5 pb-20 pt-10 sm:px-8 lg:grid-cols-[1.25fr_1fr] lg:items-center lg:pt-16">
           <div>
             <Eyebrow>Turnos con IA para peluquerías y barberías</Eyebrow>
-            <h1 className="mt-5 font-display text-5xl font-semibold leading-[1.02] tracking-tight sm:text-6xl lg:text-7xl">
-              Que se prueben el corte <span className="italic text-accent">antes</span> de sentarse.
+            <h1 className="mt-5 font-display text-5xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl">
+              Que se prueben el corte <span className="text-accent">antes</span> de sentarse.
             </h1>
             <p className="mt-6 max-w-xl text-lg leading-relaxed text-foreground/70">
               Cortesuli reemplaza el ida y vuelta por WhatsApp: tus clientes eligen día y hora y reservan en minutos. Y si quieren, antes se
