@@ -117,5 +117,4 @@ Las propuestas de la sección "Cómo funciona" se generaron con la misma IA de l
 node --env-file=.env.local scripts/generate-landing-images.mjs
 ```
 
-## Hecho para la hackatón DonWeb
-Hecho en Buenos Aires, para peluquerías de verdad.
+## Hecho para la hackatón DonWeb Day
